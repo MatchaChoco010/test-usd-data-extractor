@@ -1,0 +1,12 @@
+[package]
+name = "usd_data_extractor"
+edition.workspace = true
+version.workspace = true
+
+build = "build.rs"
+
+[dependencies]
+cxx = "1.0.121"
+
+[build-dependencies]
+cxx-build = "1.0.121"

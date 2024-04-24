@@ -1,0 +1,7 @@
+[package]
+name = "usd_view"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+usd_data_extractor = { path = "../usd_data_extractor" }
