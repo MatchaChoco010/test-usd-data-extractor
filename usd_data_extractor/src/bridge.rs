@@ -5,6 +5,6 @@ pub mod ffi {
 
         type BridgeUsdDataExtractor;
 
-        fn new_usd_data_extractor() -> UniquePtr<BridgeUsdDataExtractor>;
+        fn new_usd_data_extractor(open_path: &str) -> UniquePtr<BridgeUsdDataExtractor>;
     }
 }
