@@ -1,10 +1,11 @@
-#ifndef HD_HEBI_RENDER_DELEGATE_H
-#define HD_HEBI_RENDER_DELEGATE_H
+#ifndef BRIDGE_RENDER_DELEGATE_H
+#define BRIDGE_RENDER_DELEGATE_H
 
 #include <iostream>
 #include <memory>
 
 #include "bridgeSender.h"
+#include "mesh.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/imaging/hd/bprim.h"

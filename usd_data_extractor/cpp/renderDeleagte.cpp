@@ -89,10 +89,9 @@ HdBridgeRenderDelegate::CreateRprim(TfToken const& typeId,
                                        typeId.GetText() +
                                        " id=" + rprimId.GetText()));
 
-  // if (typeId == HdPrimTypeTokens->mesh)
-  // {
-  //     return new HdTinyMesh(rprimId);
-  // }
+  if (typeId == HdPrimTypeTokens->mesh) {
+    return new HdBridgeMesh(rprimId, _sender);
+  }
 
   TF_CODING_ERROR(
     "Unknown Rprim type=%s id=%s", typeId.GetText(), rprimId.GetText());

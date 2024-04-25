@@ -41,12 +41,6 @@ BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier) const
   (*_sender)->send_string(
     rust::String("=> end time code=" + std::to_string(endTimeCode)));
 
-  // Traverse the stage
-  for (UsdPrim prim : _stage->Traverse()) {
-    std::string path = prim.GetPath().GetAsString();
-    (*_sender)->send_string(rust::String("=> prim path=\"" + path + "\""));
-  }
-
   notifier->notify();
 }
 
