@@ -1,12 +1,14 @@
 #ifndef BRIDGE_USD_DATA_EXTRACTOR_H
 #define BRIDGE_USD_DATA_EXTRACTOR_H
 
-#include <memory>
 #include <iostream>
-#include "rust/cxx.h"
+#include <memory>
 
+#include "bridgeSender.h"
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
+#include "renderDelegate.h"
+#include "rust/cxx.h"
 // #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/engine.h"
 // #include "pxr/imaging/hd/renderIndex.h"
@@ -15,10 +17,9 @@
 // #include "pxr/imaging/hd/rprimCollection.h"
 // #include "pxr/imaging/hd/tokens.h"
 
-struct BridgeSender;
-struct BridgeSendEndNotifier;
+using namespace pxr;
 
-typedef std::shared_ptr<rust::Box<BridgeSender>> BridgeSenderSharedPtr;
+struct BridgeSendEndNotifier;
 
 class BridgeUsdDataExtractor
 {
@@ -31,10 +32,14 @@ public:
 private:
   BridgeSenderSharedPtr _sender;
   std::string _openPath;
-  pxr::HdEngine _engine;
-  pxr::UsdStageRefPtr _stage;
+  HdEngine _engine;
+  UsdStageRefPtr _stage;
+  HdBridgeRenderDelegate _renderDelegate;
+  HdRenderIndex* _renderIndex;
+  UsdImagingDelegate* _delegate;
 };
 
-std::unique_ptr<BridgeUsdDataExtractor> new_usd_data_extractor(rust::Box<BridgeSender> sender, rust::Str openPath);
+std::unique_ptr<BridgeUsdDataExtractor>
+new_usd_data_extractor(rust::Box<BridgeSender> sender, rust::Str openPath);
 
 #endif
