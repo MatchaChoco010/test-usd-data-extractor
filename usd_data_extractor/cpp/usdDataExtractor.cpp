@@ -3,22 +3,34 @@
 
 BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath)
     : _sender(std::make_shared<rust::Box<BridgeSender>>(std::move(sender))),
-      _openPath(openPath)
+      _openPath(openPath),
+      _engine(),
+      _stage()
 {
-  // Constructor
-  std::cout << "BridgeUsdDataExtractor constructor called" << std::endl;
+  _stage = pxr::UsdStage::Open(_openPath);
 }
 
 BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
 {
-  // Destructor
 }
 
 void BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier) const
 {
   // Extract USD data
-  (*_sender)->send_string(rust::String("extract called from C++!"));
-  (*_sender)->send_string(rust::String("=> open path=\"" + _openPath + "\""));
+  (*_sender)->send_string(rust::String("extract data!"));
+
+  double startTimeCode = _stage->GetStartTimeCode();
+  double endTimeCode = _stage->GetEndTimeCode();
+  (*_sender)->send_string(rust::String("=> start time code=" + std::to_string(startTimeCode)));
+  (*_sender)->send_string(rust::String("=> end time code=" + std::to_string(endTimeCode)));
+
+  // Traverse the stage
+  for (pxr::UsdPrim prim: _stage->Traverse())
+  {
+    std::string path = prim.GetPath().GetAsString();
+    (*_sender)->send_string(rust::String("=> prim path=\"" + path + "\""));
+  }
+
   notifier->notify();
 }
 

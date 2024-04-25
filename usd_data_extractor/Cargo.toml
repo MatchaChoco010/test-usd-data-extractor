@@ -11,3 +11,4 @@ oneshot = "0.1.6"
 
 [build-dependencies]
 cxx-build = "1.0.121"
+vcvars = "0.1.6"

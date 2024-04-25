@@ -1,1 +1,0 @@
-#include "../cpp/usdDataExtractor.h"
