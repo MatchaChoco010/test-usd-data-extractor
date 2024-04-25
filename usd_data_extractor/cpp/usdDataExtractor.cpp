@@ -1,10 +1,12 @@
 #include "usdDataExtractor.h"
+#include "usd_data_extractor/src/bridge.rs.h"
 
-BridgeUsdDataExtractor::BridgeUsdDataExtractor(std::string openPath)
+BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath)
+    : _sender(std::make_shared<rust::Box<BridgeSender>>(std::move(sender))),
+      _openPath(openPath)
 {
   // Constructor
   std::cout << "BridgeUsdDataExtractor constructor called" << std::endl;
-  std::cout << "=> open path=\"" << openPath << "\"" << std::endl;
 }
 
 BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
@@ -12,7 +14,14 @@ BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
   // Destructor
 }
 
-std::unique_ptr<BridgeUsdDataExtractor> new_usd_data_extractor(rust::Str openPath)
+void BridgeUsdDataExtractor::extract() const
 {
-  return std::make_unique<BridgeUsdDataExtractor>(std::string(openPath));
+  // Extract USD data
+  (*_sender)->send_string(rust::String("extract called from C++!"));
+  (*_sender)->send_string(rust::String("=> open path=\"" + _openPath + "\""));
+}
+
+std::unique_ptr<BridgeUsdDataExtractor> new_usd_data_extractor(rust::Box<BridgeSender> sender, rust::Str openPath)
+{
+  return std::make_unique<BridgeUsdDataExtractor>(std::move(sender), std::string(openPath));
 }
