@@ -20,9 +20,11 @@ impl UsdDataExtractor {
     }
 
     pub fn show_data(&mut self) {
-        self.inner.extract();
+        let (notifier, rx) = bridge::BridgeSendEndNotifier::new();
+        self.inner.extract(notifier);
+        let _ = rx.recv();
 
-        while let Ok(data) = self.rx.recv() {
+        while let Ok(data) = self.rx.try_recv() {
             match data {
                 BridgeSenderData::String(s) => {
                     println!("{}", s);

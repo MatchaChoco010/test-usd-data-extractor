@@ -14,11 +14,12 @@ BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
   // Destructor
 }
 
-void BridgeUsdDataExtractor::extract() const
+void BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier) const
 {
   // Extract USD data
   (*_sender)->send_string(rust::String("extract called from C++!"));
   (*_sender)->send_string(rust::String("=> open path=\"" + _openPath + "\""));
+  notifier->notify();
 }
 
 std::unique_ptr<BridgeUsdDataExtractor> new_usd_data_extractor(rust::Box<BridgeSender> sender, rust::Str openPath)

@@ -6,6 +6,7 @@
 #include "rust/cxx.h"
 
 struct BridgeSender;
+struct BridgeSendEndNotifier;
 
 typedef std::shared_ptr<rust::Box<BridgeSender>> BridgeSenderSharedPtr;
 
@@ -15,9 +16,8 @@ public:
   BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath);
   ~BridgeUsdDataExtractor();
 
-  void extract() const;
+  void extract(rust::Box<BridgeSendEndNotifier> notifier) const;
 
-  // void extractData(const std::string& usdFilePath);
 private:
   BridgeSenderSharedPtr _sender;
   std::string _openPath;
