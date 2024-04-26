@@ -18,11 +18,10 @@ HdDirtyBits
 HdBridgeMesh::GetInitialDirtyBitsMask() const
 {
   HdDirtyBits mask =
-    HdChangeTracker::Clean | HdChangeTracker::InitRepr |
-    HdChangeTracker::DirtyRepr | HdChangeTracker::DirtyNormals |
-    HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyPrimID |
-    HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyMaterialId |
-    HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyTransform;
+    HdChangeTracker::Clean | HdChangeTracker::DirtyNormals |
+    HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyPrimvar |
+    HdChangeTracker::DirtyMaterialId | HdChangeTracker::DirtyTopology |
+    HdChangeTracker::DirtyTransform;
   // | HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyInstancer;
   return mask;
 }
@@ -37,27 +36,16 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
   (*_sender)->message(
     rust::String(std::string("=> sync mesh! : ") + _id.GetText()));
 
-  if (*dirtyBits & HdChangeTracker::InitRepr) {
-    (*_sender)->message(rust::String("=> dirty init repr!"));
-  }
-  if (*dirtyBits & HdChangeTracker::DirtyRepr) {
-    (*_sender)->message(rust::String("=> dirty repr!"));
-  }
-
   if (*dirtyBits & HdChangeTracker::DirtyNormals) {
-    (*_sender)->message(rust::String("=> dirty normals!"));
+    _SyncNormals(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyPoints) {
-    (*_sender)->message(rust::String("=> dirty points!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyPrimID) {
-    (*_sender)->message(rust::String("=> dirty prim id!"));
+    _SyncPoints(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyPrimvar) {
-    (*_sender)->message(rust::String("=> dirty prim var!"));
+    _SyncUVs(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
@@ -65,7 +53,7 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTopology) {
-    (*_sender)->message(rust::String("=> dirty topology!"));
+    _SyncIndices(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform) {
@@ -98,4 +86,121 @@ HdBridgeMesh::_SyncTransform(HdSceneDelegate* sceneDelegate)
   rust::Slice<const double> dataSlice{ data, 16 };
 
   (*_sender)->transform_matrix(path, dataSlice);
+}
+
+void
+HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate)
+{
+  rust::String path = rust::string(this->_id.GetText());
+
+  // pointsを取得
+  VtValue value = sceneDelegate->Get(_id, HdTokens->points);
+  if (value.IsEmpty()) {
+    return;
+  }
+  if (!value.IsHolding<VtVec3fArray>()) {
+    return;
+  }
+  VtVec3fArray points = value.Get<VtVec3fArray>();
+  rust::Slice<const float> pointsSlice{ (const float*)points.data(),
+                                        points.size() * 3 };
+
+  // interpolation typeを取得
+  std::vector<HdPrimvarDescriptor> primvarDescs =
+    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
+  uint8_t interpolation = 255;
+  for (const HdPrimvarDescriptor& desc : primvarDescs) {
+    if (desc.name == HdTokens->points) {
+      interpolation = (uint8_t)desc.interpolation;
+      break;
+    }
+  }
+  if (interpolation == 255) {
+    interpolation = (uint8_t)HdInterpolationFaceVarying;
+  }
+
+  (*_sender)->points(path, pointsSlice, interpolation);
+}
+
+void
+HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate)
+{
+  rust::String path = rust::string(this->_id.GetText());
+
+  // normalsを取得
+  VtValue value = sceneDelegate->Get(_id, HdTokens->normals);
+  if (value.IsEmpty()) {
+    return;
+  }
+  if (!value.IsHolding<VtVec3fArray>()) {
+    return;
+  }
+  VtVec3fArray normals = value.Get<VtVec3fArray>();
+  rust::Slice<const float> normalsSlice{ (const float*)normals.data(),
+                                         normals.size() * 3 };
+
+  // interpolation typeを取得
+  std::vector<HdPrimvarDescriptor> primvarDescs =
+    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
+  uint8_t interpolation = 255;
+  for (const HdPrimvarDescriptor& desc : primvarDescs) {
+    if (desc.name == HdTokens->normals) {
+      interpolation = (uint8_t)desc.interpolation;
+      break;
+    }
+  }
+  if (interpolation == 255) {
+    interpolation = (uint8_t)HdInterpolationFaceVarying;
+  }
+
+  (*_sender)->normals(path, normalsSlice, interpolation);
+}
+
+void
+HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
+{
+  rust::String path = rust::string(this->_id.GetText());
+
+  // uvsを取得
+  TfToken uvPrimvarName("st");
+  VtValue value = sceneDelegate->Get(_id, uvPrimvarName);
+  if (value.IsEmpty()) {
+    return;
+  }
+  if (!value.IsHolding<VtVec2fArray>()) {
+    return;
+  }
+  VtVec2fArray uvs = value.Get<VtVec2fArray>();
+  rust::Slice<const float> uvsSlice{ (const float*)uvs.data(), uvs.size() * 2 };
+
+  // interpolation typeを取得
+  std::vector<HdPrimvarDescriptor> primvarDescs =
+    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
+  uint8_t interpolation = 255;
+  for (const HdPrimvarDescriptor& desc : primvarDescs) {
+    if (desc.name == uvPrimvarName) {
+      interpolation = (uint8_t)desc.interpolation;
+      break;
+    }
+  }
+  if (interpolation == 255) {
+    interpolation = (uint8_t)HdInterpolationFaceVarying;
+  }
+
+  (*_sender)->uvs(path, uvsSlice, interpolation);
+}
+
+void
+HdBridgeMesh::_SyncIndices(HdSceneDelegate* sceneDelegate)
+{
+  rust::String path = rust::string(this->_id.GetText());
+
+  HdMeshTopology topology = sceneDelegate->GetMeshTopology(_id);
+  const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
+
+  rust::Slice<const int> faceVertexIndicesSlice{
+    (const int*)faceVertexIndices.data(), faceVertexIndices.size()
+  };
+
+  (*_sender)->indices(path, faceVertexIndicesSlice);
 }

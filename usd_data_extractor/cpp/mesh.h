@@ -32,6 +32,10 @@ private:
   BridgeSenderSharedPtr _sender;
 
   void _SyncTransform(HdSceneDelegate* sceneDelegate);
+  void _SyncPoints(HdSceneDelegate* sceneDelegate);
+  void _SyncNormals(HdSceneDelegate* sceneDelegate);
+  void _SyncUVs(HdSceneDelegate* sceneDelegate);
+  void _SyncIndices(HdSceneDelegate* sceneDelegate);
 
   // This class does not support copying.
   HdBridgeMesh(const HdBridgeMesh&) = delete;

@@ -9,6 +9,10 @@ pub mod ffi {
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
         fn transform_matrix(self: &BridgeSender, path: String, matrix: &[f64]);
+        fn points(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
+        fn normals(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
+        fn uvs(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
+        fn indices(self: &BridgeSender, path: String, data: &[i32]);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -56,6 +60,27 @@ impl BridgeSender {
             }
         }
         let data = BridgeData::TransformMatrix(UsdSdfPath(path), data);
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn points(&self, path: String, data: &[f32], interpolation: u8) {
+        let data = BridgeData::Points(UsdSdfPath(path), data.to_vec(), interpolation.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn normals(&self, path: String, data: &[f32], interpolation: u8) {
+        let data = BridgeData::Normals(UsdSdfPath(path), data.to_vec(), interpolation.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn uvs(&self, path: String, data: &[f32], interpolation: u8) {
+        let data = BridgeData::Uvs(UsdSdfPath(path), data.to_vec(), interpolation.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn indices(&self, path: String, data: &[i32]) {
+        let data = data.iter().map(|&i| i as u32).collect::<Vec<_>>();
+        let data = BridgeData::Indices(UsdSdfPath(path), data);
         self.sender.send(data).unwrap();
     }
 }

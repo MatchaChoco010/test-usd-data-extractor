@@ -5,6 +5,29 @@ use std::sync::mpsc::Receiver;
 mod bridge;
 
 #[derive(Debug, Clone)]
+pub enum Interpolation {
+    Constant,
+    Uniform,
+    Varying,
+    Vertex,
+    FaceVarying,
+    Instance,
+}
+impl From<u8> for Interpolation {
+    fn from(i: u8) -> Self {
+        match i {
+            0 => Interpolation::Constant,
+            1 => Interpolation::Uniform,
+            2 => Interpolation::Varying,
+            3 => Interpolation::Vertex,
+            4 => Interpolation::FaceVarying,
+            5 => Interpolation::Instance,
+            _ => panic!("Invalid interpolation value: {}", i),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UsdSdfPath(pub String);
 impl Display for UsdSdfPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -16,6 +39,10 @@ pub enum BridgeData {
     Message(String),
     TimeCodeRange(f64, f64),
     TransformMatrix(UsdSdfPath, [f32; 16]),
+    Points(UsdSdfPath, Vec<f32>, Interpolation),
+    Normals(UsdSdfPath, Vec<f32>, Interpolation),
+    Uvs(UsdSdfPath, Vec<f32>, Interpolation),
+    Indices(UsdSdfPath, Vec<u32>),
 }
 
 pub struct UsdDataExtractor {
