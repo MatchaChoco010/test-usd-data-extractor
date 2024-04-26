@@ -31,6 +31,8 @@ private:
   SdfPath _id;
   BridgeSenderSharedPtr _sender;
 
+  void _SyncTransform(HdSceneDelegate* sceneDelegate);
+
   // This class does not support copying.
   HdBridgeMesh(const HdBridgeMesh&) = delete;
   HdBridgeMesh& operator=(const HdBridgeMesh&) = delete;

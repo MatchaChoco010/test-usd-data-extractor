@@ -1,11 +1,21 @@
+use std::fmt::Display;
 use std::path::Path;
 use std::sync::mpsc::Receiver;
 
 mod bridge;
 
+#[derive(Debug, Clone)]
+pub struct UsdSdfPath(pub String);
+impl Display for UsdSdfPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub enum BridgeData {
     Message(String),
     TimeCodeRange(f64, f64),
+    TransformMatrix(UsdSdfPath, [f32; 16]),
 }
 
 pub struct UsdDataExtractor {

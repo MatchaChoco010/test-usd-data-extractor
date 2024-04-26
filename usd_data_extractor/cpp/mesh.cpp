@@ -19,14 +19,11 @@ HdBridgeMesh::GetInitialDirtyBitsMask() const
 {
   HdDirtyBits mask =
     HdChangeTracker::Clean | HdChangeTracker::InitRepr |
-    HdChangeTracker::DirtyCullStyle | HdChangeTracker::DirtyDoubleSided |
-    HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals |
+    HdChangeTracker::DirtyRepr | HdChangeTracker::DirtyNormals |
     HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyPrimID |
-    HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyDisplayStyle |
-    HdChangeTracker::DirtyRepr | HdChangeTracker::DirtyMaterialId |
-    HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyTransform |
-    HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyInstancer;
-  ;
+    HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyMaterialId |
+    HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyTransform;
+  // | HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyInstancer;
   return mask;
 }
 
@@ -43,17 +40,8 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & HdChangeTracker::InitRepr) {
     (*_sender)->message(rust::String("=> dirty init repr!"));
   }
-
-  if (*dirtyBits & HdChangeTracker::DirtyCullStyle) {
-    (*_sender)->message(rust::String("=> dirty cull style!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyDoubleSided) {
-    (*_sender)->message(rust::String("=> dirty double sided!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyExtent) {
-    (*_sender)->message(rust::String("=> dirty extent!"));
+  if (*dirtyBits & HdChangeTracker::DirtyRepr) {
+    (*_sender)->message(rust::String("=> dirty repr!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyNormals) {
@@ -72,14 +60,6 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
     (*_sender)->message(rust::String("=> dirty prim var!"));
   }
 
-  if (*dirtyBits & HdChangeTracker::DirtyDisplayStyle) {
-    (*_sender)->message(rust::String("=> dirty display style!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyRepr) {
-    (*_sender)->message(rust::String("=> dirty repr!"));
-  }
-
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
     (*_sender)->message(rust::String("=> dirty material id!"));
   }
@@ -89,15 +69,7 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform) {
-    (*_sender)->message(rust::String("=> dirty transform!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyVisibility) {
-    (*_sender)->message(rust::String("=> dirty visibility!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyInstancer) {
-    (*_sender)->message(rust::String("=> dirty instancer!"));
+    _SyncTransform(sceneDelegate);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -114,4 +86,16 @@ HdDirtyBits
 HdBridgeMesh::_PropagateDirtyBits(HdDirtyBits bits) const
 {
   return bits;
+}
+
+void
+HdBridgeMesh::_SyncTransform(HdSceneDelegate* sceneDelegate)
+{
+  rust::String path = rust::string(this->_id.GetText());
+
+  GfMatrix4d matrix = sceneDelegate->GetTransform(_id);
+  const double* data = matrix.GetArray();
+  rust::Slice<const double> dataSlice{ data, 16 };
+
+  (*_sender)->transform_matrix(path, dataSlice);
 }

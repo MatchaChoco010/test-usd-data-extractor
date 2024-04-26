@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crate::BridgeData;
+use crate::{BridgeData, UsdSdfPath};
 
 #[cxx::bridge]
 pub mod ffi {
@@ -8,6 +8,7 @@ pub mod ffi {
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
+        fn transform_matrix(self: &BridgeSender, path: String, matrix: &[f64]);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -43,6 +44,18 @@ impl BridgeSender {
 
     pub fn time_code_range(&self, start: f64, end: f64) {
         let data = BridgeData::TimeCodeRange(start, end);
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn transform_matrix(&self, path: String, matrix: &[f64]) {
+        // row-major to column-major
+        let mut data = [0.0_f32; 16];
+        for r in 0..4 {
+            for c in 0..4 {
+                data[r * 4 + c] = matrix[c * 4 + r] as f32;
+            }
+        }
+        let data = BridgeData::TransformMatrix(UsdSdfPath(path), data);
         self.sender.send(data).unwrap();
     }
 }
