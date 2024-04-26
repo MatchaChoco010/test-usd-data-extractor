@@ -92,7 +92,7 @@ fn main() {
         .files(cpp_files)
         .compile("usd-data-extractor-cpp");
 
-    println!("cargo:rerun-if-changed={manifest_dir}/src/");
+    println!("cargo:rerun-if-changed={manifest_dir}/src/bridge.rs");
     println!("cargo:rerun-if-changed={manifest_dir}/cpp/");
 
     println!("cargo:rustc-link-search={}", usd_dst.join("lib").display());

@@ -26,6 +26,10 @@ BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender,
   TfTokenVector renderTags;
   renderTags.push_back(HdRenderTagTokens->geometry);
   _renderTags = renderTags;
+
+  double startTimeCode = _stage->GetStartTimeCode();
+  double endTimeCode = _stage->GetEndTimeCode();
+  (*_sender)->time_code_range(startTimeCode, endTimeCode);
 }
 
 BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
@@ -35,14 +39,10 @@ BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
 }
 
 void
-BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier)
+BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier,
+                                double timeCode)
 {
-  double startTimeCode = _stage->GetStartTimeCode();
-  double endTimeCode = _stage->GetEndTimeCode();
-  (*_sender)->send_string(
-    rust::String("=> start time code=" + std::to_string(startTimeCode)));
-  (*_sender)->send_string(
-    rust::String("=> end time code=" + std::to_string(endTimeCode)));
+  _delegate->SetTime(timeCode);
 
   HdTaskSharedPtrVector tasks = {
     std::make_shared<SyncTask>(

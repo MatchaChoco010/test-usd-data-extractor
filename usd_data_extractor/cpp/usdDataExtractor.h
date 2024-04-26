@@ -26,7 +26,7 @@ public:
   BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath);
   virtual ~BridgeUsdDataExtractor();
 
-  void extract(rust::Box<BridgeSendEndNotifier> notifier);
+  void extract(rust::Box<BridgeSendEndNotifier> notifier, double timeCode);
 
 private:
   BridgeSenderSharedPtr _sender;

@@ -10,7 +10,7 @@ HdBridgeMesh::HdBridgeMesh(SdfPath const& id, BridgeSenderSharedPtr sender)
 
 HdBridgeMesh::~HdBridgeMesh()
 {
-  (*_sender)->send_string(
+  (*_sender)->message(
     rust::String(std::string("=> destroy mesh! : ") + _id.GetText()));
 }
 
@@ -37,67 +37,67 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
                    TfToken const& reprToken)
 {
 
-  (*_sender)->send_string(
+  (*_sender)->message(
     rust::String(std::string("=> sync mesh! : ") + _id.GetText()));
 
   if (*dirtyBits & HdChangeTracker::InitRepr) {
-    (*_sender)->send_string(rust::String("=> dirty init repr!"));
+    (*_sender)->message(rust::String("=> dirty init repr!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyCullStyle) {
-    (*_sender)->send_string(rust::String("=> dirty cull style!"));
+    (*_sender)->message(rust::String("=> dirty cull style!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyDoubleSided) {
-    (*_sender)->send_string(rust::String("=> dirty double sided!"));
+    (*_sender)->message(rust::String("=> dirty double sided!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyExtent) {
-    (*_sender)->send_string(rust::String("=> dirty extent!"));
+    (*_sender)->message(rust::String("=> dirty extent!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyNormals) {
-    (*_sender)->send_string(rust::String("=> dirty normals!"));
+    (*_sender)->message(rust::String("=> dirty normals!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyPoints) {
-    (*_sender)->send_string(rust::String("=> dirty points!"));
+    (*_sender)->message(rust::String("=> dirty points!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyPrimID) {
-    (*_sender)->send_string(rust::String("=> dirty prim id!"));
+    (*_sender)->message(rust::String("=> dirty prim id!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyPrimvar) {
-    (*_sender)->send_string(rust::String("=> dirty prim var!"));
+    (*_sender)->message(rust::String("=> dirty prim var!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyDisplayStyle) {
-    (*_sender)->send_string(rust::String("=> dirty display style!"));
+    (*_sender)->message(rust::String("=> dirty display style!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyRepr) {
-    (*_sender)->send_string(rust::String("=> dirty repr!"));
+    (*_sender)->message(rust::String("=> dirty repr!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
-    (*_sender)->send_string(rust::String("=> dirty material id!"));
+    (*_sender)->message(rust::String("=> dirty material id!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTopology) {
-    (*_sender)->send_string(rust::String("=> dirty topology!"));
+    (*_sender)->message(rust::String("=> dirty topology!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform) {
-    (*_sender)->send_string(rust::String("=> dirty transform!"));
+    (*_sender)->message(rust::String("=> dirty transform!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyVisibility) {
-    (*_sender)->send_string(rust::String("=> dirty visibility!"));
+    (*_sender)->message(rust::String("=> dirty visibility!"));
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyInstancer) {
-    (*_sender)->send_string(rust::String("=> dirty instancer!"));
+    (*_sender)->message(rust::String("=> dirty instancer!"));
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -106,7 +106,7 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
 void
 HdBridgeMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
 {
-  (*_sender)->send_string(
+  (*_sender)->message(
     rust::String(std::string("=> init repr! : ") + _id.GetText()));
 }
 

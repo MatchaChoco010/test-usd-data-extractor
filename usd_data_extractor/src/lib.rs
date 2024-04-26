@@ -3,13 +3,14 @@ use std::sync::mpsc::Receiver;
 
 mod bridge;
 
-pub enum BridgeSenderData {
-    String(String),
+pub enum BridgeData {
+    Message(String),
+    TimeCodeRange(f64, f64),
 }
 
 pub struct UsdDataExtractor {
     inner: cxx::UniquePtr<bridge::ffi::BridgeUsdDataExtractor>,
-    rx: Receiver<BridgeSenderData>,
+    rx: Receiver<BridgeData>,
 }
 impl UsdDataExtractor {
     pub fn new(path: impl AsRef<Path>) -> Self {
@@ -19,29 +20,25 @@ impl UsdDataExtractor {
         Self { inner, rx }
     }
 
-    pub fn show_data(&mut self) {
+    pub fn extract(&mut self, time_code: f64) -> Vec<BridgeData> {
         let (notifier, rx) = bridge::BridgeSendEndNotifier::new();
         let inner = self.inner.pin_mut();
-        inner.extract(notifier);
+        inner.extract(notifier, time_code);
         let _ = rx.recv();
 
-        while let Ok(data) = self.rx.try_recv() {
-            match data {
-                BridgeSenderData::String(s) => {
-                    println!("{}", s);
-                }
-            }
+        let mut data = vec![];
+        while let Ok(d) = self.rx.try_recv() {
+            data.push(d);
         }
+        data
     }
 
-    pub fn destroy(self) {
+    pub fn destroy(self) -> Vec<BridgeData> {
         drop(self.inner);
-        while let Ok(data) = self.rx.try_recv() {
-            match data {
-                BridgeSenderData::String(s) => {
-                    println!("{}", s);
-                }
-            }
+        let mut data = vec![];
+        while let Ok(d) = self.rx.try_recv() {
+            data.push(d);
         }
+        data
     }
 }
