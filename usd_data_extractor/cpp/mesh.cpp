@@ -1,15 +1,18 @@
 #include "mesh.h"
 #include "usd_data_extractor/src/bridge.rs.h"
 
-using namespace pxr;
-
 HdBridgeMesh::HdBridgeMesh(SdfPath const& id, BridgeSenderSharedPtr sender)
   : HdMesh(id)
+  , _id(id)
   , _sender(sender)
 {
 }
 
-HdBridgeMesh::~HdBridgeMesh() {}
+HdBridgeMesh::~HdBridgeMesh()
+{
+  (*_sender)->send_string(
+    rust::String(std::string("=> destroy mesh! : ") + _id.GetText()));
+}
 
 HdDirtyBits
 HdBridgeMesh::GetInitialDirtyBitsMask() const
@@ -34,7 +37,8 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
                    TfToken const& reprToken)
 {
 
-  (*_sender)->send_string(rust::String("=> sync mesh!"));
+  (*_sender)->send_string(
+    rust::String(std::string("=> sync mesh! : ") + _id.GetText()));
 
   if (*dirtyBits & HdChangeTracker::InitRepr) {
     (*_sender)->send_string(rust::String("=> dirty init repr!"));
@@ -103,7 +107,7 @@ void
 HdBridgeMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
 {
   (*_sender)->send_string(
-    rust::String(std::string("=> init repr!") + reprToken.GetText()));
+    rust::String(std::string("=> init repr! : ") + _id.GetText()));
 }
 
 HdDirtyBits

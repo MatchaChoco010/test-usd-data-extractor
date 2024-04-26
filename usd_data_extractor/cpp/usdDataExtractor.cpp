@@ -1,8 +1,5 @@
 #include "usdDataExtractor.h"
-
 #include "usd_data_extractor/src/bridge.rs.h"
-
-using namespace pxr;
 
 BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender,
                                                std::string openPath)
@@ -20,6 +17,15 @@ BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender,
   _stage = UsdStage::Open(_openPath);
 
   _delegate->Populate(_stage->GetPseudoRoot());
+
+  HdRprimCollection collection = HdRprimCollection(
+    HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
+  _renderPass =
+    HdRenderPassSharedPtr(new BridgeRenderPass(_renderIndex, collection));
+
+  TfTokenVector renderTags;
+  renderTags.push_back(HdRenderTagTokens->geometry);
+  _renderTags = renderTags;
 }
 
 BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
@@ -29,11 +35,8 @@ BridgeUsdDataExtractor::~BridgeUsdDataExtractor()
 }
 
 void
-BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier) const
+BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier)
 {
-  // Extract USD data
-  (*_sender)->send_string(rust::String("extract data!"));
-
   double startTimeCode = _stage->GetStartTimeCode();
   double endTimeCode = _stage->GetEndTimeCode();
   (*_sender)->send_string(
@@ -41,7 +44,11 @@ BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier) const
   (*_sender)->send_string(
     rust::String("=> end time code=" + std::to_string(endTimeCode)));
 
-  notifier->notify();
+  HdTaskSharedPtrVector tasks = {
+    std::make_shared<SyncTask>(
+      _renderPass, TfTokenVector(), std::move(notifier)),
+  };
+  _engine.Execute(&_delegate->GetRenderIndex(), &tasks);
 }
 
 std::unique_ptr<BridgeUsdDataExtractor>

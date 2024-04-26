@@ -1,9 +1,6 @@
 #ifndef BRIDGE_RENDER_DELEGATE_H
 #define BRIDGE_RENDER_DELEGATE_H
 
-#include <iostream>
-#include <memory>
-
 #include "bridgeSender.h"
 #include "mesh.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -17,6 +14,8 @@
 #include "pxr/imaging/hd/sprim.h"
 #include "pxr/pxr.h"
 #include "rust/cxx.h"
+#include <iostream>
+#include <memory>
 
 using namespace pxr;
 
@@ -26,7 +25,7 @@ public:
   HdBridgeRenderDelegate(BridgeSenderSharedPtr sender);
   HdBridgeRenderDelegate(HdRenderSettingsMap const& settingsMap,
                          BridgeSenderSharedPtr sender);
-  virtual ~HdBridgeRenderDelegate();
+  virtual ~HdBridgeRenderDelegate() override = default;
 
   const TfTokenVector& GetSupportedRprimTypes() const override;
   const TfTokenVector& GetSupportedSprimTypes() const override;
@@ -59,7 +58,6 @@ public:
 
 private:
   BridgeSenderSharedPtr _sender;
-  HdResourceRegistrySharedPtr _resourceRegistry;
 
   void _Initialize();
 

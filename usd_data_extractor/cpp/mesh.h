@@ -6,6 +6,7 @@
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/pxr.h"
 #include "rust/cxx.h"
+#include <iostream>
 
 using namespace pxr;
 
@@ -27,6 +28,7 @@ protected:
   HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
 private:
+  SdfPath _id;
   BridgeSenderSharedPtr _sender;
 
   // This class does not support copying.

@@ -1,8 +1,6 @@
 #include "renderDelegate.h"
 #include "usd_data_extractor/src/bridge.rs.h"
 
-using namespace pxr;
-
 TfTokenVector SUPPORTED_RPRIM_TYPES = {
   HdPrimTypeTokens->mesh,
 };
@@ -32,12 +30,6 @@ HdBridgeRenderDelegate::HdBridgeRenderDelegate(
 void
 HdBridgeRenderDelegate::_Initialize()
 {
-  _resourceRegistry = std::make_shared<HdResourceRegistry>();
-}
-
-HdBridgeRenderDelegate::~HdBridgeRenderDelegate()
-{
-  _resourceRegistry.reset();
 }
 
 TfTokenVector const&
@@ -61,23 +53,18 @@ HdBridgeRenderDelegate::GetSupportedBprimTypes() const
 HdResourceRegistrySharedPtr
 HdBridgeRenderDelegate::GetResourceRegistry() const
 {
-  return _resourceRegistry;
+  return nullptr;
 }
 
 void
 HdBridgeRenderDelegate::CommitResources(HdChangeTracker* tracker)
 {
-  (*_sender)->send_string(rust::String("=> CommitResources RenderDelegate"));
 }
 
 HdRenderPassSharedPtr
 HdBridgeRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                          HdRprimCollection const& collection)
 {
-  // std::cout << "Create RenderPass with Collection="
-  //           << collection.GetName() << std::endl;
-
-  // return HdRenderPassSharedPtr(new HdBridgeRenderPass(index, collection));
   return nullptr;
 }
 
@@ -102,8 +89,6 @@ HdBridgeRenderDelegate::CreateRprim(TfToken const& typeId,
 void
 HdBridgeRenderDelegate::DestroyRprim(HdRprim* rPrim)
 {
-  (*_sender)->send_string(rust::String(std::string("=> Destroy Rprim id=") +
-                                       rPrim->GetId().GetText()));
   delete rPrim;
 }
 

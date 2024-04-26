@@ -12,11 +12,10 @@ pub mod ffi {
         fn notify(self: &mut BridgeSendEndNotifier);
     }
     unsafe extern "C++" {
-        // include!("usd_data_extractor/include/include.h");
         include!("usd_data_extractor/cpp/usdDataExtractor.h");
 
         type BridgeUsdDataExtractor;
-        fn extract(&self, notifier: Box<BridgeSendEndNotifier>);
+        fn extract(self: Pin<&mut BridgeUsdDataExtractor>, notifier: Box<BridgeSendEndNotifier>);
         fn new_usd_data_extractor(
             sender: Box<BridgeSender>,
             open_path: &str,

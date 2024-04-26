@@ -5,29 +5,28 @@
 #include <memory>
 
 #include "bridgeSender.h"
+#include "pxr/imaging/hd/changeTracker.h"
+#include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/renderIndex.h"
+#include "pxr/imaging/hd/renderPass.h"
+#include "pxr/imaging/hd/rprim.h"
+#include "pxr/imaging/hd/rprimCollection.h"
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "renderDelegate.h"
 #include "rust/cxx.h"
-// #include "pxr/imaging/hd/changeTracker.h"
-#include "pxr/imaging/hd/engine.h"
-// #include "pxr/imaging/hd/renderIndex.h"
-// #include "pxr/imaging/hd/renderPass.h"
-// #include "pxr/imaging/hd/rprim.h"
-// #include "pxr/imaging/hd/rprimCollection.h"
-// #include "pxr/imaging/hd/tokens.h"
+#include "syncTask.h"
 
 using namespace pxr;
-
-struct BridgeSendEndNotifier;
 
 class BridgeUsdDataExtractor
 {
 public:
   BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath);
-  ~BridgeUsdDataExtractor();
+  virtual ~BridgeUsdDataExtractor();
 
-  void extract(rust::Box<BridgeSendEndNotifier> notifier) const;
+  void extract(rust::Box<BridgeSendEndNotifier> notifier);
 
 private:
   BridgeSenderSharedPtr _sender;
@@ -37,6 +36,8 @@ private:
   HdBridgeRenderDelegate _renderDelegate;
   HdRenderIndex* _renderIndex;
   UsdImagingDelegate* _delegate;
+  HdRenderPassSharedPtr _renderPass;
+  TfTokenVector _renderTags;
 };
 
 std::unique_ptr<BridgeUsdDataExtractor>
