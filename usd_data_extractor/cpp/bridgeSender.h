@@ -7,6 +7,6 @@
 #include "rust/cxx.h"
 
 struct BridgeSender;
-typedef std::shared_ptr<rust::Box<BridgeSender>> BridgeSenderSharedPtr;
+using BridgeSenderSharedPtr = std::shared_ptr<rust::Box<BridgeSender>>;
 
 #endif
