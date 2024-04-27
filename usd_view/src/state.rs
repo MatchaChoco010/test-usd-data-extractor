@@ -14,10 +14,11 @@ pub struct State<'a> {
 
     renderer: Renderer,
     egui_renderer: EguiRenderer,
+    scene_loader: SceneLoader,
 
     usd_filename: String,
-    usd_time_code: i32,
-    scene_loader: SceneLoader,
+    usd_time_code: i64,
+    usd_time_code_range: std::ops::RangeInclusive<i64>,
 }
 
 impl<'a> State<'a> {
@@ -74,7 +75,7 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let renderer = Renderer::new(Arc::clone(&device), Arc::clone(&queue));
+        let renderer = Renderer::new(Arc::clone(&device), Arc::clone(&queue), config.clone());
 
         let egui_renderer = EguiRenderer::new(
             window,
@@ -82,6 +83,8 @@ impl<'a> State<'a> {
             Arc::clone(&queue),
             surface_caps.formats[0],
         );
+
+        let scene_loader = SceneLoader::new(Arc::clone(&device), Arc::clone(&queue));
 
         State {
             surface,
@@ -92,11 +95,11 @@ impl<'a> State<'a> {
 
             renderer,
             egui_renderer,
+            scene_loader,
 
             usd_filename: String::new(),
             usd_time_code: 1,
-
-            scene_loader: SceneLoader::new(),
+            usd_time_code_range: 1..=1,
         }
     }
 
@@ -106,6 +109,7 @@ impl<'a> State<'a> {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.renderer.resize(&self.config);
         }
     }
 
@@ -133,8 +137,12 @@ impl<'a> State<'a> {
         {}
 
         // main rendering
-        self.scene_loader.read_scene(|_scene| {
-            self.renderer.render(&view, &mut encoder);
+        let size = window.inner_size();
+        self.scene_loader.read_scene(|scene| {
+            self.renderer.render(&view, &mut encoder, size, scene);
+            if let Some(range) = &scene.range {
+                self.usd_time_code_range = range.start..=range.end;
+            }
         });
 
         // egui rendering
@@ -146,10 +154,13 @@ impl<'a> State<'a> {
             &mut encoder,
             &mut self.usd_filename,
             &mut self.usd_time_code,
+            self.usd_time_code_range.clone(),
             &mut load_button_clicked,
         );
         if load_button_clicked {
+            self.usd_time_code = 1;
             self.scene_loader.load_usd(&self.usd_filename);
+            self.scene_loader.set_time_code(self.usd_time_code);
         }
         if prev_time_code != self.usd_time_code {
             self.scene_loader.set_time_code(self.usd_time_code);

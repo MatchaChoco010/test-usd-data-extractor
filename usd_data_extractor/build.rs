@@ -19,14 +19,17 @@ fn main() {
     let mut vcvars = vcvars::Vcvars::new();
     let visual_studio_version = vcvars.get_cached("VisualStudioVersion").unwrap();
 
-    let out_dir = env::var("OUT_DIR").unwrap();
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let usd_dir = PathBuf::from(&manifest_dir)
         .parent()
         .unwrap()
         .join("OpenUSD");
+    let target_dir = PathBuf::from(&manifest_dir)
+        .parent()
+        .unwrap()
+        .join("target");
     let usd_dir = usd_dir.to_str().unwrap();
-    let usd_dst = PathBuf::from(&out_dir).join("OpenUSD");
+    let usd_dst = PathBuf::from(&target_dir).join("OpenUSD");
 
     let pxr_lib_prefix = env::var("PXR_LIB_PREFIX").unwrap_or("usd".to_string());
 
@@ -54,16 +57,6 @@ fn main() {
         println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
         println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
         panic!("failed to build OpenUSD");
-    }
-
-    // copy dll to target dir
-    for f in fs::read_dir(usd_dst.join("bin")).unwrap() {
-        let f = f.unwrap();
-        let f = f.file_name();
-        let f = f.to_str().unwrap();
-        if f.ends_with(".dll") {
-            fs::copy(usd_dst.join("bin").join(f), PathBuf::from(&out_dir).join(f)).unwrap();
-        }
     }
 
     // collect cpp files
@@ -103,6 +96,41 @@ fn main() {
         if f.ends_with(".lib") {
             let f = f.trim_end_matches(".lib");
             println!("cargo:rustc-link-lib=static={}", f);
+        }
+    }
+
+    // copy dll to profile dir
+    let profile = env::var("PROFILE").unwrap();
+    let profile_dir = target_dir.join(profile);
+    let usd_path = usd_dst.to_str().unwrap();
+    for entry in glob::glob(&format!("{usd_path}/bin/*.dll")).unwrap() {
+        if let Ok(path) = entry {
+            fs::copy(&path, profile_dir.join(path.file_name().unwrap())).unwrap();
+        }
+    }
+
+    // copy usd plugin dll, usda and json files to profile dir
+    for entry in glob::glob(&format!("{usd_path}/lib/*.dll")).unwrap() {
+        if let Ok(path) = entry {
+            fs::copy(&path, profile_dir.join(path.file_name().unwrap())).unwrap();
+        }
+    }
+    for entry in glob::glob(&format!("{usd_path}/lib/usd/**/*.json")).unwrap() {
+        if let Ok(path) = entry {
+            let relative_path = path.strip_prefix(&usd_dst.join("lib")).unwrap();
+            if let Some(parent) = relative_path.parent() {
+                fs::create_dir_all(profile_dir.join(parent)).unwrap();
+            }
+            fs::copy(&path, profile_dir.join(relative_path)).unwrap();
+        }
+    }
+    for entry in glob::glob(&format!("{usd_path}/lib/usd/**/*.usda")).unwrap() {
+        if let Ok(path) = entry {
+            let relative_path = path.strip_prefix(&usd_dst.join("lib")).unwrap();
+            if let Some(parent) = relative_path.parent() {
+                fs::create_dir_all(profile_dir.join(parent)).unwrap();
+            }
+            fs::copy(&path, profile_dir.join(relative_path)).unwrap();
         }
     }
 }

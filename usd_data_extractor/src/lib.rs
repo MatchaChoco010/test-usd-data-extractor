@@ -37,8 +37,8 @@ pub struct MeshData {
     pub normals_interpolation: Option<Interpolation>,
     pub uvs_data: Option<Vec<f32>>,
     pub uvs_interpolation: Option<Interpolation>,
-    pub face_vertex_indices: Vec<i32>,
-    pub face_vertex_counts: Vec<i32>,
+    pub face_vertex_indices: Vec<u64>,
+    pub face_vertex_counts: Vec<u32>,
 }
 impl From<Box<bridge::MeshData>> for MeshData {
     fn from(data: Box<bridge::MeshData>) -> Self {
@@ -84,11 +84,12 @@ pub struct UsdDataExtractor {
     rx: Receiver<BridgeData>,
 }
 impl UsdDataExtractor {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, String> {
         let (tx, rx) = std::sync::mpsc::channel();
         let sender = Box::new(bridge::BridgeSender::new(tx));
-        let inner = bridge::ffi::new_usd_data_extractor(sender, path.as_ref().to_str().unwrap());
-        Self { inner, rx }
+        let inner = bridge::ffi::new_usd_data_extractor(sender, path.as_ref().to_str().unwrap())
+            .map_err(|e| String::from(e.what()))?;
+        Ok(Self { inner, rx })
     }
 
     pub fn extract(&mut self, time_code: f64) -> Vec<BridgeData> {

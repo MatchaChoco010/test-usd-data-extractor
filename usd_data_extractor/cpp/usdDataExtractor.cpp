@@ -15,6 +15,9 @@ BridgeUsdDataExtractor::BridgeUsdDataExtractor(rust::Box<BridgeSender> sender,
   _delegate = new UsdImagingDelegate(_renderIndex, SdfPath::AbsoluteRootPath());
 
   _stage = UsdStage::Open(_openPath);
+  if (!_stage) {
+    throw std::runtime_error("Failed to open stage");
+  }
 
   _delegate->Populate(_stage->GetPseudoRoot());
 

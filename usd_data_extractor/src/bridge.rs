@@ -11,8 +11,8 @@ pub mod ffi {
         fn set_points(self: &mut MeshData, data: &[f32], interpolation: u8);
         fn set_normals(self: &mut MeshData, data: &[f32], interpolation: u8);
         fn set_uvs(self: &mut MeshData, data: &[f32], interpolation: u8);
-        fn set_face_vertex_indices(self: &mut MeshData, data: &[i32]);
-        fn set_face_vertex_counts(self: &mut MeshData, data: &[i32]);
+        fn set_face_vertex_indices(self: &mut MeshData, data: &[u64]);
+        fn set_face_vertex_counts(self: &mut MeshData, data: &[u32]);
 
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
@@ -37,7 +37,7 @@ pub mod ffi {
         fn new_usd_data_extractor(
             sender: Box<BridgeSender>,
             open_path: &str,
-        ) -> UniquePtr<BridgeUsdDataExtractor>;
+        ) -> Result<UniquePtr<BridgeUsdDataExtractor>>;
     }
 }
 
@@ -63,8 +63,8 @@ pub struct MeshData {
     pub normals_interpolation: Option<Interpolation>,
     pub uvs_data: Option<Vec<f32>>,
     pub uvs_interpolation: Option<Interpolation>,
-    pub face_vertex_indices: Option<Vec<i32>>,
-    pub face_vertex_counts: Option<Vec<i32>>,
+    pub face_vertex_indices: Option<Vec<u64>>,
+    pub face_vertex_counts: Option<Vec<u32>>,
 }
 impl MeshData {
     pub fn set_left_handed(&mut self, left_handed: bool) {
@@ -86,11 +86,11 @@ impl MeshData {
         self.uvs_interpolation = Some(interpolation.into());
     }
 
-    pub fn set_face_vertex_indices(&mut self, data: &[i32]) {
+    pub fn set_face_vertex_indices(&mut self, data: &[u64]) {
         self.face_vertex_indices = Some(data.to_vec());
     }
 
-    pub fn set_face_vertex_counts(&mut self, data: &[i32]) {
+    pub fn set_face_vertex_counts(&mut self, data: &[u32]) {
         self.face_vertex_counts = Some(data.to_vec());
     }
 }
@@ -119,12 +119,9 @@ impl BridgeSender {
     }
 
     pub fn transform_matrix(&self, path: String, matrix: &[f64]) {
-        // row-major to column-major
-        let mut data = [0.0_f32; 16];
-        for r in 0..4 {
-            for c in 0..4 {
-                data[r * 4 + c] = matrix[c * 4 + r] as f32;
-            }
+        let mut data = [0.0; 16];
+        for i in 0..16 {
+            data[i] = matrix[i] as f32;
         }
         let data = BridgeData::TransformMatrix(UsdSdfPath(path), data);
         self.sender.send(data).unwrap();

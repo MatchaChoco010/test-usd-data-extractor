@@ -143,14 +143,25 @@ HdBridgeMesh::_SyncMeshData(HdSceneDelegate* sceneDelegate)
     HdMeshTopology topology = sceneDelegate->GetMeshTopology(_id);
 
     const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
-    rust::Slice<const int> faceVertexIndicesSlice{
-      (const int*)faceVertexIndices.data(), faceVertexIndices.size()
+    std::vector<uint64_t> faceVertexIndicesData;
+    faceVertexIndicesData.reserve(faceVertexIndices.size());
+    for (int i : faceVertexIndices) {
+      faceVertexIndicesData.push_back(i);
+    }
+    rust::Slice<const uint64_t> faceVertexIndicesSlice{
+      (const uint64_t*)faceVertexIndicesData.data(),
+      faceVertexIndicesData.size()
     };
     meshData->set_face_vertex_indices(faceVertexIndicesSlice);
 
     const VtIntArray& faceVertexCounts = topology.GetFaceVertexCounts();
-    rust::Slice<const int> faceVertexCountsSlice{
-      (const int*)faceVertexCounts.data(), faceVertexCounts.size()
+    std::vector<uint32_t> faceVertexCountsData;
+    faceVertexCountsData.reserve(faceVertexCounts.size());
+    for (int i : faceVertexCounts) {
+      faceVertexCountsData.push_back(i);
+    }
+    rust::Slice<const uint32_t> faceVertexCountsSlice{
+      (const uint32_t*)faceVertexCountsData.data(), faceVertexCountsData.size()
     };
     meshData->set_face_vertex_counts(faceVertexCountsSlice);
   }
