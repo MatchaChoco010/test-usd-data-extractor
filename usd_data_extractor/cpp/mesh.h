@@ -33,13 +33,6 @@ private:
 
   void _SyncTransform(HdSceneDelegate* sceneDelegate);
   void _SyncMeshData(HdSceneDelegate* sceneDelegate);
-  void _SyncPoints(HdSceneDelegate* sceneDelegate,
-                   rust::Box<MeshData>& meshData);
-  void _SyncNormals(HdSceneDelegate* sceneDelegate,
-                    rust::Box<MeshData>& meshData);
-  void _SyncUVs(HdSceneDelegate* sceneDelegate, rust::Box<MeshData>& meshData);
-  void _SyncTopology(HdSceneDelegate* sceneDelegate,
-                     rust::Box<MeshData>& meshData);
 
   // This class does not support copying.
   HdBridgeMesh(const HdBridgeMesh&) = delete;
