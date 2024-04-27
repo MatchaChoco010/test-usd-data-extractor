@@ -4,6 +4,7 @@ fn show_data(data: BridgeData) {
     match data {
         BridgeData::Message(s) => println!("{}", s),
         BridgeData::TimeCodeRange(start, end) => println!("TimeCodeRange: {start} - {end}"),
+        BridgeData::CreateMesh(path) => println!("{path} [CreateMesh]"),
         BridgeData::TransformMatrix(path, matrix) => {
             println!("{path} [TransformMatrix]");
             for r in 0..4 {
@@ -79,6 +80,7 @@ fn show_data(data: BridgeData) {
             }
             println!("...");
         }
+        BridgeData::DestroyMesh(path) => println!("{path} [DestroyMesh]"),
     }
 }
 

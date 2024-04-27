@@ -6,12 +6,14 @@ HdBridgeMesh::HdBridgeMesh(SdfPath const& id, BridgeSenderSharedPtr sender)
   , _id(id)
   , _sender(sender)
 {
+  rust::String path = rust::string(this->_id.GetText());
+  (*_sender)->create_mesh(path);
 }
 
 HdBridgeMesh::~HdBridgeMesh()
 {
-  (*_sender)->message(
-    rust::String(std::string("=> destroy mesh! : ") + _id.GetText()));
+  rust::String path = rust::string(this->_id.GetText());
+  (*_sender)->destroy_mesh(path);
 }
 
 HdDirtyBits
@@ -32,10 +34,6 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
                    HdDirtyBits* dirtyBits,
                    TfToken const& reprToken)
 {
-
-  (*_sender)->message(
-    rust::String(std::string("=> sync mesh! : ") + _id.GetText()));
-
   if (*dirtyBits & HdChangeTracker::DirtyNormals) {
     _SyncNormals(sceneDelegate);
   }
@@ -66,8 +64,6 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
 void
 HdBridgeMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
 {
-  (*_sender)->message(
-    rust::String(std::string("=> init repr! : ") + _id.GetText()));
 }
 
 HdDirtyBits

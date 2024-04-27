@@ -72,10 +72,6 @@ HdRprim*
 HdBridgeRenderDelegate::CreateRprim(TfToken const& typeId,
                                     SdfPath const& rprimId)
 {
-  (*_sender)->message(rust::String(std::string("=> Create Rprim") +
-                                   typeId.GetText() +
-                                   " id=" + rprimId.GetText()));
-
   if (typeId == HdPrimTypeTokens->mesh) {
     return new HdBridgeMesh(rprimId, _sender);
   }

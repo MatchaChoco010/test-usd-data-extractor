@@ -8,11 +8,13 @@ pub mod ffi {
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
+        fn create_mesh(self: &BridgeSender, path: String);
         fn transform_matrix(self: &BridgeSender, path: String, matrix: &[f64]);
         fn points(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn normals(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn uvs(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn indices(self: &BridgeSender, path: String, data: &[i32]);
+        fn destroy_mesh(self: &BridgeSender, path: String);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -51,6 +53,11 @@ impl BridgeSender {
         self.sender.send(data).unwrap();
     }
 
+    pub fn create_mesh(&self, path: String) {
+        let data = BridgeData::CreateMesh(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
     pub fn transform_matrix(&self, path: String, matrix: &[f64]) {
         // row-major to column-major
         let mut data = [0.0_f32; 16];
@@ -81,6 +88,11 @@ impl BridgeSender {
     pub fn indices(&self, path: String, data: &[i32]) {
         let data = data.iter().map(|&i| i as u32).collect::<Vec<_>>();
         let data = BridgeData::Indices(UsdSdfPath(path), data);
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_mesh(&self, path: String) {
+        let data = BridgeData::DestroyMesh(UsdSdfPath(path));
         self.sender.send(data).unwrap();
     }
 }

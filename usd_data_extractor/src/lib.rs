@@ -38,11 +38,13 @@ impl Display for UsdSdfPath {
 pub enum BridgeData {
     Message(String),
     TimeCodeRange(f64, f64),
+    CreateMesh(UsdSdfPath),
     TransformMatrix(UsdSdfPath, [f32; 16]),
     Points(UsdSdfPath, Vec<f32>, Interpolation),
     Normals(UsdSdfPath, Vec<f32>, Interpolation),
     Uvs(UsdSdfPath, Vec<f32>, Interpolation),
     Indices(UsdSdfPath, Vec<u32>),
+    DestroyMesh(UsdSdfPath),
 }
 
 pub struct UsdDataExtractor {
