@@ -1,6 +1,7 @@
 use usd_data_extractor::*;
 use winit::{
     event::*,
+    event_loop::ControlFlow,
     keyboard::{Key, NamedKey},
 };
 
@@ -151,35 +152,44 @@ fn main() -> Result<(), winit::error::EventLoopError> {
 
     let mut renderer = pollster::block_on(renderer::Renderer::new(&window));
 
-    event_loop.run(|event, target| match event {
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        logical_key: Key::Named(NamedKey::Escape),
+    event_loop.run(|event, target| {
+        target.set_control_flow(ControlFlow::Poll);
+        match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == window.id() => {
+                renderer.handle_event(&window, event);
+                match event {
+                    WindowEvent::CloseRequested
+                    | WindowEvent::KeyboardInput {
+                        event:
+                            KeyEvent {
+                                state: ElementState::Pressed,
+                                logical_key: Key::Named(NamedKey::Escape),
+                                ..
+                            },
                         ..
+                    } => target.exit(),
+                    WindowEvent::Resized(physical_size) => {
+                        renderer.resize(*physical_size);
+                    }
+                    WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                        renderer.change_scale_factor(*scale_factor as f32);
+                    }
+                    WindowEvent::RedrawRequested => match renderer.draw(&window) {
+                        Ok(_) => {}
+                        Err(wgpu::SurfaceError::Lost) => renderer.resize(window.inner_size()),
+                        Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                        Err(e) => eprintln!("{:?}", e),
                     },
-                ..
-            } => target.exit(),
-            WindowEvent::Resized(physical_size) => {
-                renderer.resize(*physical_size);
+                    _ => {}
+                }
             }
-            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                renderer.change_scale_factor(*scale_factor as f32);
+            Event::AboutToWait { .. } => {
+                window.request_redraw();
             }
-            WindowEvent::RedrawRequested => match renderer.draw() {
-                Ok(_) => {}
-                Err(wgpu::SurfaceError::Lost) => renderer.resize(window.inner_size()),
-                Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                Err(e) => eprintln!("{:?}", e),
-            },
             _ => {}
-        },
-        _ => {}
+        }
     })
 }
