@@ -7,6 +7,7 @@ pub mod ffi {
     extern "Rust" {
         type MeshData;
         fn new_mesh_data() -> Box<MeshData>;
+        fn set_left_handed(self: &mut MeshData, left_handed: bool);
         fn set_points(self: &mut MeshData, data: &[f32], interpolation: u8);
         fn set_normals(self: &mut MeshData, data: &[f32], interpolation: u8);
         fn set_uvs(self: &mut MeshData, data: &[f32], interpolation: u8);
@@ -42,6 +43,7 @@ pub mod ffi {
 
 pub fn new_mesh_data() -> Box<MeshData> {
     Box::new(MeshData {
+        left_handed: false,
         points_data: None,
         points_interpolation: None,
         normals_data: None,
@@ -54,6 +56,7 @@ pub fn new_mesh_data() -> Box<MeshData> {
 }
 
 pub struct MeshData {
+    pub left_handed: bool,
     pub points_data: Option<Vec<f32>>,
     pub points_interpolation: Option<Interpolation>,
     pub normals_data: Option<Vec<f32>>,
@@ -64,6 +67,10 @@ pub struct MeshData {
     pub face_vertex_counts: Option<Vec<i32>>,
 }
 impl MeshData {
+    pub fn set_left_handed(&mut self, left_handed: bool) {
+        self.left_handed = left_handed;
+    }
+
     pub fn set_points(&mut self, data: &[f32], interpolation: u8) {
         self.points_data = Some(data.to_vec());
         self.points_interpolation = Some(interpolation.into());

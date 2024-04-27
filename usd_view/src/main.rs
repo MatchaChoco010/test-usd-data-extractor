@@ -18,6 +18,12 @@ fn show_data(data: BridgeData) {
         BridgeData::MeshData(path, data) => {
             println!("{path} [MeshData]");
 
+            if data.left_handed {
+                println!("    [LeftHanded]: true");
+            } else {
+                println!("    [LeftHanded]: false");
+            }
+
             {
                 println!(
                     "    [Points], len: {}, interpolation: {:?}",

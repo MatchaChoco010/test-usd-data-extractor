@@ -80,6 +80,18 @@ HdBridgeMesh::_SyncMeshData(HdSceneDelegate* sceneDelegate)
   rust::String path = rust::string(this->_id.GetText());
   rust::Box<MeshData> meshData = new_mesh_data();
 
+  // check left-handed or right-handed
+  {
+    TfToken orientation("orientation");
+    VtValue orientationValue = sceneDelegate->Get(_id, orientation);
+    if (!orientationValue.IsEmpty() && orientationValue.IsHolding<TfToken>()) {
+      TfToken orientation = orientationValue.Get<TfToken>();
+      if (orientation == HdTokens->leftHanded) {
+        meshData->set_left_handed(true);
+      }
+    }
+  }
+
   // primvars
   TfToken uvPrimvarName("st");
   std::vector<HdPrimvarDescriptor> primvarDescs;

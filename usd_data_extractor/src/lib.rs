@@ -30,6 +30,7 @@ impl From<u8> for Interpolation {
 #[derive(Debug, Clone)]
 
 pub struct MeshData {
+    pub left_handed: bool,
     pub points_data: Vec<f32>,
     pub points_interpolation: Interpolation,
     pub normals_data: Option<Vec<f32>>,
@@ -42,6 +43,7 @@ pub struct MeshData {
 impl From<Box<bridge::MeshData>> for MeshData {
     fn from(data: Box<bridge::MeshData>) -> Self {
         Self {
+            left_handed: data.left_handed,
             points_data: data.points_data.expect("MeshData has no points data"),
             points_interpolation: data
                 .points_interpolation
