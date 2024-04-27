@@ -1,4 +1,10 @@
 use usd_data_extractor::*;
+use winit::{
+    event::*,
+    keyboard::{Key, NamedKey},
+};
+
+mod renderer;
 
 fn show_data(data: BridgeData) {
     match data {
@@ -109,8 +115,10 @@ fn show_data(data: BridgeData) {
     }
 }
 
-fn main() {
-    let mut usd_data_extractor = UsdDataExtractor::new("./test-usd/test.usd");
+fn main() -> Result<(), winit::error::EventLoopError> {
+    env_logger::init();
+
+    let mut usd_data_extractor = UsdDataExtractor::new("./test-usd/test.usda");
 
     println!("Extracting USD data... (TimeCode: 1.0)");
     let diff = usd_data_extractor.extract(1.0);
@@ -129,4 +137,49 @@ fn main() {
     for data in diff {
         show_data(data);
     }
+
+    let event_loop = winit::event_loop::EventLoop::new().unwrap();
+    let window = winit::window::WindowBuilder::new()
+        .with_resizable(true)
+        .with_title("my usd view")
+        .with_inner_size(winit::dpi::PhysicalSize {
+            width: 800,
+            height: 600,
+        })
+        .build(&event_loop)
+        .unwrap();
+
+    let mut renderer = pollster::block_on(renderer::Renderer::new(&window));
+
+    event_loop.run(|event, target| match event {
+        Event::WindowEvent {
+            ref event,
+            window_id,
+        } if window_id == window.id() => match event {
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        logical_key: Key::Named(NamedKey::Escape),
+                        ..
+                    },
+                ..
+            } => target.exit(),
+            WindowEvent::Resized(physical_size) => {
+                renderer.resize(*physical_size);
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                renderer.change_scale_factor(*scale_factor as f32);
+            }
+            WindowEvent::RedrawRequested => match renderer.draw() {
+                Ok(_) => {}
+                Err(wgpu::SurfaceError::Lost) => renderer.resize(window.inner_size()),
+                Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                Err(e) => eprintln!("{:?}", e),
+            },
+            _ => {}
+        },
+        _ => {}
+    })
 }
