@@ -9,8 +9,7 @@ mod renderer;
 mod scene_loader;
 mod state;
 
-#[tokio::main]
-async fn main() -> Result<(), winit::error::EventLoopError> {
+fn main() -> Result<(), winit::error::EventLoopError> {
     env_logger::init();
 
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
@@ -24,7 +23,7 @@ async fn main() -> Result<(), winit::error::EventLoopError> {
         .build(&event_loop)
         .unwrap();
 
-    let mut state = state::State::new(&window).await;
+    let mut state = pollster::block_on(state::State::new(&window));
 
     event_loop.run(|event, target| {
         target.set_control_flow(ControlFlow::Poll);

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Arc, Mutex,
+};
 use usd_data_extractor::*;
 
 pub struct TimeCodeRange {
@@ -11,27 +14,104 @@ pub struct Scene {
 }
 
 pub struct SceneLoader {
-    usd_data_extractor: Option<UsdDataExtractor>,
     scene: Arc<Mutex<Scene>>,
+    open_usd_sender: Sender<String>,
+    time_code_sender: Sender<i32>,
+    stop_sender: Sender<()>,
+    join_handle: Option<std::thread::JoinHandle<()>>,
 }
 impl SceneLoader {
     pub fn new() -> Self {
+        let scene = Arc::new(Mutex::new(Scene { range: None }));
+        let (time_code_sender, time_code_receiver) = channel();
+        let (open_usd_sender, open_usd_receiver) = channel();
+        let (stop_sender, stop_receiver) = channel();
+
+        let join_handle = UsdSceneExtractorTask::run(
+            Arc::clone(&scene),
+            open_usd_receiver,
+            time_code_receiver,
+            stop_receiver,
+        );
+
         Self {
-            usd_data_extractor: None,
-            scene: Arc::new(Mutex::new(Scene { range: None })),
+            scene,
+            open_usd_sender,
+            time_code_sender,
+            stop_sender,
+            join_handle: Some(join_handle),
         }
     }
 
-    pub fn load_usd(&mut self, filename: &str) {
-        {
-            let mut scene = self.scene.lock().unwrap();
-            self.usd_data_extractor = Some(UsdDataExtractor::new(filename));
-            *scene = Scene { range: None };
-        }
-        self.set_time_code(1);
+    pub fn load_usd(&self, filename: &str) {
+        self.open_usd_sender.send(filename.to_string()).unwrap();
     }
 
-    pub fn set_time_code(&mut self, time_code: i32) {
+    pub fn set_time_code(&self, time_code: i32) {
+        self.time_code_sender.send(time_code).unwrap();
+    }
+
+    pub fn read_scene(&self, f: impl FnOnce(&Scene)) {
+        let scene = self.scene.lock().unwrap();
+        f(&scene);
+    }
+}
+impl Drop for SceneLoader {
+    fn drop(&mut self) {
+        self.stop_sender.send(()).unwrap();
+        let join_handle = self.join_handle.take().unwrap();
+        join_handle.join().unwrap();
+    }
+}
+
+pub struct UsdSceneExtractorTask {
+    usd_data_extractor: Option<UsdDataExtractor>,
+    scene: Arc<Mutex<Scene>>,
+}
+impl UsdSceneExtractorTask {
+    pub fn run(
+        scene: Arc<Mutex<Scene>>,
+        open_usd_receiver: Receiver<String>,
+        time_code_receiver: Receiver<i32>,
+        stop_receiver: Receiver<()>,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            let mut task = Self {
+                usd_data_extractor: None,
+                scene,
+            };
+
+            loop {
+                let mut filename = None;
+                while let Ok(file) = open_usd_receiver.try_recv() {
+                    filename = Some(file);
+                }
+                if let Some(filename) = filename {
+                    task.load_usd(&filename);
+                }
+
+                let mut time_code = None;
+                while let Ok(tc) = time_code_receiver.try_recv() {
+                    time_code = Some(tc);
+                }
+                if let Some(time_code) = time_code {
+                    task.set_time_code(time_code);
+                }
+
+                if stop_receiver.try_recv().is_ok() {
+                    break;
+                }
+            }
+        })
+    }
+
+    fn load_usd(&mut self, filename: &str) {
+        let mut scene = self.scene.lock().unwrap();
+        self.usd_data_extractor = Some(UsdDataExtractor::new(filename));
+        *scene = Scene { range: None };
+    }
+
+    fn set_time_code(&mut self, time_code: i32) {
         let Some(usd_data_extractor) = &mut self.usd_data_extractor else {
             return;
         };
@@ -52,11 +132,6 @@ impl SceneLoader {
                 _ => (),
             }
         }
-    }
-
-    pub fn read_scene(&self, f: impl FnOnce(&Scene)) {
-        let scene = self.scene.lock().unwrap();
-        f(&scene);
     }
 }
 

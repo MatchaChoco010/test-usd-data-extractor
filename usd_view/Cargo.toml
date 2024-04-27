@@ -8,7 +8,7 @@ egui = "0.27.2"
 egui-wgpu = "0.27.2"
 egui-winit = "0.27.2"
 env_logger = "0.11.3"
-tokio = { version = "1.37.0", features = ["full"] }
+pollster = "0.3.0"
 usd_data_extractor = { path = "../usd_data_extractor" }
 wgpu = "0.19.4"
 winit = "0.29.15"
