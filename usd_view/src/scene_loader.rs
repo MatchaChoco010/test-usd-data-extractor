@@ -210,8 +210,9 @@ impl UsdSceneExtractorTask {
             }
 
             if mesh.dirty_mesh {
-                let triangulate_indices = {
-                    let mut triangulate_indices = Vec::new();
+                let (face_varying_triangulate_indices, vertex_triangulate_indices) = {
+                    let mut face_varying_triangulate_indices = Vec::new();
+                    let mut vertex_triangulate_indices = Vec::new();
                     let (Some(face_vertex_indices), Some(face_vertex_counts)) =
                         (&mesh.face_vertex_indices, &mesh.face_vertex_counts)
                     else {
@@ -221,15 +222,19 @@ impl UsdSceneExtractorTask {
                     for face_vertex_count in face_vertex_counts {
                         let face_vertex_count = *face_vertex_count as usize;
                         for i in 2..face_vertex_count {
-                            triangulate_indices.push(face_vertex_indices[index_offset] as usize);
-                            triangulate_indices
+                            vertex_triangulate_indices
+                                .push(face_vertex_indices[index_offset] as usize);
+                            vertex_triangulate_indices
                                 .push(face_vertex_indices[index_offset + i - 1] as usize);
-                            triangulate_indices
+                            vertex_triangulate_indices
                                 .push(face_vertex_indices[index_offset + i] as usize);
+                            face_varying_triangulate_indices.push(index_offset);
+                            face_varying_triangulate_indices.push(index_offset + i - 1);
+                            face_varying_triangulate_indices.push(index_offset + i);
                         }
                         index_offset += face_vertex_count;
                     }
-                    triangulate_indices
+                    (face_varying_triangulate_indices, vertex_triangulate_indices)
                 };
 
                 let vertex_points = {
@@ -239,13 +244,19 @@ impl UsdSceneExtractorTask {
                         continue;
                     };
                     match points_interpolation {
-                        Interpolation::Vertex => {
-                            bytemuck::cast_slice::<f32, Vec3>(&points).to_vec()
-                        }
                         Interpolation::FaceVarying => {
                             let points = bytemuck::cast_slice::<f32, Vec3>(&points);
-                            let mut data = Vec::with_capacity(triangulate_indices.len());
-                            for &index in &triangulate_indices {
+                            let mut data =
+                                Vec::with_capacity(face_varying_triangulate_indices.len());
+                            for &index in &face_varying_triangulate_indices {
+                                data.push(points[index]);
+                            }
+                            data
+                        }
+                        Interpolation::Vertex => {
+                            let points = bytemuck::cast_slice::<f32, Vec3>(&points);
+                            let mut data = Vec::with_capacity(vertex_triangulate_indices.len());
+                            for &index in &vertex_triangulate_indices {
                                 data.push(points[index]);
                             }
                             data
@@ -259,13 +270,19 @@ impl UsdSceneExtractorTask {
                         (&mesh.normals_data, &mesh.normals_interpolation)
                     {
                         match normals_interpolation {
-                            Interpolation::Vertex => {
-                                bytemuck::cast_slice::<f32, Vec3>(&normals).to_vec()
-                            }
                             Interpolation::FaceVarying => {
                                 let normals = bytemuck::cast_slice::<f32, Vec3>(&normals);
-                                let mut data = Vec::with_capacity(triangulate_indices.len());
-                                for &index in &triangulate_indices {
+                                let mut data =
+                                    Vec::with_capacity(face_varying_triangulate_indices.len());
+                                for &index in &face_varying_triangulate_indices {
+                                    data.push(normals[index]);
+                                }
+                                data
+                            }
+                            Interpolation::Vertex => {
+                                let normals = bytemuck::cast_slice::<f32, Vec3>(&normals);
+                                let mut data = Vec::with_capacity(vertex_triangulate_indices.len());
+                                for &index in &vertex_triangulate_indices {
                                     data.push(normals[index]);
                                 }
                                 data
@@ -279,11 +296,19 @@ impl UsdSceneExtractorTask {
                         };
                         let points = bytemuck::cast_slice::<f32, Vec3>(points);
                         let mut normals_point = vec![vec![]; points.len()];
-                        for face_indices in triangulate_indices.chunks(3) {
+                        let indices = match mesh.points_interpolation {
+                            Some(Interpolation::FaceVarying) => &face_varying_triangulate_indices,
+                            Some(Interpolation::Vertex) => &vertex_triangulate_indices,
+                            _ => continue,
+                        };
+                        for face_indices in indices.chunks(3) {
                             let p0 = points[face_indices[0]];
                             let p1 = points[face_indices[1]];
                             let p2 = points[face_indices[2]];
-                            let normal = (p1 - p0).cross(p2 - p0).normalize();
+                            let mut normal = (p1 - p0).cross(p2 - p0).normalize();
+                            if mesh.left_handed {
+                                normal = -normal;
+                            }
                             for &index in face_indices {
                                 normals_point[index].push(normal);
                             }
@@ -296,8 +321,8 @@ impl UsdSceneExtractorTask {
                             }
                             mean_normals.push(mean_normal.normalize());
                         }
-                        let mut vertex_normals = Vec::with_capacity(triangulate_indices.len());
-                        for &index in &triangulate_indices {
+                        let mut vertex_normals = Vec::with_capacity(indices.len());
+                        for &index in indices {
                             vertex_normals.push(mean_normals[index]);
                         }
                         vertex_normals
@@ -309,13 +334,19 @@ impl UsdSceneExtractorTask {
                         (&mesh.uvs_data, &mesh.uvs_interpolation)
                     {
                         match uvs_interpolation {
-                            Interpolation::Vertex => {
-                                Some(bytemuck::cast_slice::<f32, Vec2>(uvs).to_vec())
-                            }
                             Interpolation::FaceVarying => {
                                 let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
-                                let mut data = Vec::with_capacity(triangulate_indices.len());
-                                for &index in &triangulate_indices {
+                                let mut data =
+                                    Vec::with_capacity(face_varying_triangulate_indices.len());
+                                for &index in &face_varying_triangulate_indices {
+                                    data.push(uvs[index]);
+                                }
+                                Some(data)
+                            }
+                            Interpolation::Vertex => {
+                                let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
+                                let mut data = Vec::with_capacity(vertex_triangulate_indices.len());
+                                for &index in &vertex_triangulate_indices {
                                     data.push(uvs[index]);
                                 }
                                 Some(data)
@@ -327,9 +358,10 @@ impl UsdSceneExtractorTask {
                     }
                 };
 
-                let mut vertex_data = Vec::with_capacity(triangulate_indices.len());
+                let vertex_count = face_varying_triangulate_indices.len();
+                let mut vertex_data = Vec::with_capacity(vertex_count);
                 if mesh.left_handed {
-                    for face in triangulate_indices.chunks(3) {
+                    for face in (0..vertex_count).collect::<Vec<_>>().chunks(3) {
                         for i in face.iter().rev() {
                             vertex_data.push(Vertex {
                                 position: vertex_points[*i],
@@ -339,7 +371,7 @@ impl UsdSceneExtractorTask {
                         }
                     }
                 } else {
-                    for i in triangulate_indices {
+                    for i in 0..vertex_count {
                         vertex_data.push(Vertex {
                             position: vertex_points[i],
                             normal: vertex_normals[i],
