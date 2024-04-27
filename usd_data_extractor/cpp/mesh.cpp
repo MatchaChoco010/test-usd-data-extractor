@@ -34,24 +34,14 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
                    HdDirtyBits* dirtyBits,
                    TfToken const& reprToken)
 {
-  if (*dirtyBits & HdChangeTracker::DirtyNormals) {
-    _SyncNormals(sceneDelegate);
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyPoints) {
-    _SyncPoints(sceneDelegate);
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyPrimvar) {
-    _SyncUVs(sceneDelegate);
+  if (*dirtyBits &
+      (HdChangeTracker::DirtyNormals | HdChangeTracker::DirtyPoints |
+       HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyTopology)) {
+    _SyncMeshData(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
     (*_sender)->message(rust::String("=> dirty material id!"));
-  }
-
-  if (*dirtyBits & HdChangeTracker::DirtyTopology) {
-    _SyncTopology(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform) {
@@ -85,10 +75,21 @@ HdBridgeMesh::_SyncTransform(HdSceneDelegate* sceneDelegate)
 }
 
 void
-HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate)
+HdBridgeMesh::_SyncMeshData(HdSceneDelegate* sceneDelegate)
 {
   rust::String path = rust::string(this->_id.GetText());
+  rust::Box<MeshData> meshData = new_mesh_data();
+  _SyncPoints(sceneDelegate, meshData);
+  _SyncNormals(sceneDelegate, meshData);
+  _SyncUVs(sceneDelegate, meshData);
+  _SyncTopology(sceneDelegate, meshData);
+  (*_sender)->mesh_data(path, std::move(meshData));
+}
 
+void
+HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate,
+                          rust::Box<MeshData>& meshData)
+{
   // pointsを取得
   std::vector<HdPrimvarDescriptor> primvarDescs =
     sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
@@ -101,7 +102,7 @@ HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate)
         rust::Slice<const float> pointsSlice{ (const float*)points.data(),
                                               points.size() * 3 };
 
-        (*_sender)->points(path, pointsSlice, (uint8_t)desc.interpolation);
+        meshData->set_points(pointsSlice, (uint8_t)desc.interpolation);
       }
 
       break;
@@ -110,10 +111,9 @@ HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate)
 }
 
 void
-HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate)
+HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate,
+                           rust::Box<MeshData>& meshData)
 {
-  rust::String path = rust::string(this->_id.GetText());
-
   // normalsを取得
   std::vector<HdPrimvarDescriptor> primvarDescs;
   {
@@ -133,7 +133,7 @@ HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate)
         rust::Slice<const float> normalsSlice{ (const float*)normals.data(),
                                                normals.size() * 3 };
 
-        (*_sender)->normals(path, normalsSlice, (uint8_t)desc.interpolation);
+        meshData->set_normals(normalsSlice, (uint8_t)desc.interpolation);
       }
 
       break;
@@ -142,10 +142,9 @@ HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate)
 }
 
 void
-HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
+HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate,
+                       rust::Box<MeshData>& meshData)
 {
-  rust::String path = rust::string(this->_id.GetText());
-
   // uvsを取得
   TfToken uvPrimvarName("st");
   std::vector<HdPrimvarDescriptor> primvarDescs =
@@ -159,7 +158,7 @@ HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
         rust::Slice<const float> uvsSlice{ (const float*)uvs.data(),
                                            uvs.size() * 2 };
 
-        (*_sender)->uvs(path, uvsSlice, (uint8_t)desc.interpolation);
+        meshData->set_uvs(uvsSlice, (uint8_t)desc.interpolation);
       }
 
       break;
@@ -168,21 +167,20 @@ HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
 }
 
 void
-HdBridgeMesh::_SyncTopology(HdSceneDelegate* sceneDelegate)
+HdBridgeMesh::_SyncTopology(HdSceneDelegate* sceneDelegate,
+                            rust::Box<MeshData>& meshData)
 {
-  rust::String path = rust::string(this->_id.GetText());
-
   HdMeshTopology topology = sceneDelegate->GetMeshTopology(_id);
 
   const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
   rust::Slice<const int> faceVertexIndicesSlice{
     (const int*)faceVertexIndices.data(), faceVertexIndices.size()
   };
-  (*_sender)->face_vertex_indices(path, faceVertexIndicesSlice);
+  meshData->set_face_vertex_indices(faceVertexIndicesSlice);
 
   const VtIntArray& faceVertexCounts = topology.GetFaceVertexCounts();
   rust::Slice<const int> faceVertexCountsSlice{
     (const int*)faceVertexCounts.data(), faceVertexCounts.size()
   };
-  (*_sender)->face_vertex_counts(path, faceVertexCountsSlice);
+  meshData->set_face_vertex_counts(faceVertexCountsSlice);
 }

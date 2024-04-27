@@ -11,4 +11,6 @@ using BridgeSenderSharedPtr = std::shared_ptr<rust::Box<BridgeSender>>;
 
 struct BridgeSendEndNotifier;
 
+struct MeshData;
+
 #endif

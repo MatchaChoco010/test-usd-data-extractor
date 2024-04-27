@@ -28,6 +28,39 @@ impl From<u8> for Interpolation {
 }
 
 #[derive(Debug, Clone)]
+
+pub struct MeshData {
+    pub points_data: Vec<f32>,
+    pub points_interpolation: Interpolation,
+    pub normals_data: Option<Vec<f32>>,
+    pub normals_interpolation: Option<Interpolation>,
+    pub uvs_data: Option<Vec<f32>>,
+    pub uvs_interpolation: Option<Interpolation>,
+    pub face_vertex_indices: Vec<i32>,
+    pub face_vertex_counts: Vec<i32>,
+}
+impl From<Box<bridge::MeshData>> for MeshData {
+    fn from(data: Box<bridge::MeshData>) -> Self {
+        Self {
+            points_data: data.points_data.expect("MeshData has no points data"),
+            points_interpolation: data
+                .points_interpolation
+                .expect("MeshData has no points data"),
+            normals_data: data.normals_data,
+            normals_interpolation: data.normals_interpolation,
+            uvs_data: data.uvs_data,
+            uvs_interpolation: data.uvs_interpolation,
+            face_vertex_indices: data
+                .face_vertex_indices
+                .expect("MeshData has no face vertex indices data"),
+            face_vertex_counts: data
+                .face_vertex_counts
+                .expect("MeshData has no face vertex count data"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UsdSdfPath(pub String);
 impl Display for UsdSdfPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -40,11 +73,7 @@ pub enum BridgeData {
     TimeCodeRange(f64, f64),
     CreateMesh(UsdSdfPath),
     TransformMatrix(UsdSdfPath, [f32; 16]),
-    Points(UsdSdfPath, Vec<f32>, Interpolation),
-    Normals(UsdSdfPath, Vec<f32>, Interpolation),
-    Uvs(UsdSdfPath, Vec<f32>, Interpolation),
-    FaceVertexIndices(UsdSdfPath, Vec<u32>),
-    FaceVertexCount(UsdSdfPath, Vec<u8>),
+    MeshData(UsdSdfPath, MeshData),
     DestroyMesh(UsdSdfPath),
 }
 

@@ -15,78 +15,89 @@ fn show_data(data: BridgeData) {
                 println!();
             }
         }
-        BridgeData::Points(path, data, interpolation) => {
-            println!(
-                "{} [Points], len: {}, interpolation: {:?}",
-                path,
-                data.len() / 3,
-                interpolation
-            );
-            print!("    ");
-            for i in 0..9.min(data.len()) {
-                if i % 3 == 0 {
-                    print!("(");
+        BridgeData::MeshData(path, data) => {
+            println!("{path} [MeshData]");
+
+            {
+                println!(
+                    "    [Points], len: {}, interpolation: {:?}",
+                    data.points_data.len() / 3,
+                    data.points_interpolation
+                );
+                print!("        ");
+                for i in 0..9.min(data.points_data.len()) {
+                    if i % 3 == 0 {
+                        print!("(");
+                    }
+                    print!("{:+6.4} ", data.points_data[i]);
+                    if i % 3 == 2 {
+                        print!("), ");
+                    }
                 }
-                print!("{:+6.4} ", data[i]);
-                if i % 3 == 2 {
-                    print!("), ");
-                }
+                println!("...");
             }
-            println!("...");
-        }
-        BridgeData::Normals(path, data, interpolation) => {
-            println!(
-                "{} [Normals], len: {}, interpolation: {:?}",
-                path,
-                data.len() / 3,
-                interpolation
-            );
-            print!("    ");
-            for i in 0..9.min(data.len()) {
-                if i % 3 == 0 {
-                    print!("(");
+
+            if data.normals_data.is_some() {
+                println!(
+                    "    [Normals], len: {}, interpolation: {:?}",
+                    data.normals_data.as_ref().unwrap().len() / 3,
+                    data.normals_interpolation.as_ref().unwrap()
+                );
+                print!("        ");
+                for i in 0..9.min(data.normals_data.as_ref().unwrap().len()) {
+                    if i % 3 == 0 {
+                        print!("(");
+                    }
+                    print!("{:+6.4} ", data.normals_data.as_ref().unwrap()[i]);
+                    if i % 3 == 2 {
+                        print!("), ");
+                    }
                 }
-                print!("{:+6.4} ", data[i]);
-                if i % 3 == 2 {
-                    print!("), ");
+                println!("...");
+            }
+
+            if data.uvs_data.is_some() {
+                println!(
+                    "    [UVs], len: {}, interpolation: {:?}",
+                    data.uvs_data.as_ref().unwrap().len() / 2,
+                    data.uvs_interpolation.as_ref().unwrap()
+                );
+                print!("        ");
+                for i in 0..6.min(data.uvs_data.as_ref().unwrap().len()) {
+                    if i % 2 == 0 {
+                        print!("(");
+                    }
+                    print!("{:+6.4} ", data.uvs_data.as_ref().unwrap()[i]);
+                    if i % 2 == 1 {
+                        print!("), ");
+                    }
                 }
+                println!("...");
             }
-            println!("...");
-        }
-        BridgeData::Uvs(path, data, interpolation) => {
-            println!(
-                "{} [UVs], len: {}, interpolation: {:?}",
-                path,
-                data.len() / 2,
-                interpolation
-            );
-            print!("    ");
-            for i in 0..6.min(data.len()) {
-                if i % 2 == 0 {
-                    print!("(");
+
+            {
+                println!(
+                    "    [FaceVertexIndices], len: {}",
+                    data.face_vertex_indices.len()
+                );
+                print!("        ");
+                for i in 0..6.min(data.face_vertex_indices.len()) {
+                    print!("{}, ", data.face_vertex_indices[i]);
                 }
-                print!("{:+6.4} ", data[i]);
-                if i % 2 == 1 {
-                    print!("), ");
+                println!("...");
+            }
+
+            {
+                println!(
+                    "    [FaceVertexCount], len: {}",
+                    data.face_vertex_counts.len()
+                );
+                print!("        ");
+                for i in 0..6.min(data.face_vertex_counts.len()) {
+                    print!("{}, ", data.face_vertex_counts[i]);
                 }
+                println!("...");
             }
-            println!("...");
-        }
-        BridgeData::FaceVertexIndices(path, data) => {
-            println!("{} [Indices], len: {}", path, data.len());
-            print!("    ");
-            for i in 0..6.min(data.len()) {
-                print!("{}, ", data[i]);
-            }
-            println!("...");
-        }
-        BridgeData::FaceVertexCount(path, data) => {
-            println!("{} [FaceVertexCount], len: {}", path, data.len());
-            print!("    ");
-            for i in 0..6.min(data.len()) {
-                print!("{}, ", data[i]);
-            }
-            println!("...");
         }
         BridgeData::DestroyMesh(path) => println!("{path} [DestroyMesh]"),
     }
