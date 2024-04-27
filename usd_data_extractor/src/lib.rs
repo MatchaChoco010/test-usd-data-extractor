@@ -44,6 +44,7 @@ pub enum BridgeData {
     Normals(UsdSdfPath, Vec<f32>, Interpolation),
     Uvs(UsdSdfPath, Vec<f32>, Interpolation),
     Indices(UsdSdfPath, Vec<u32>),
+    FaceVertexCount(UsdSdfPath, Vec<u8>),
     DestroyMesh(UsdSdfPath),
 }
 

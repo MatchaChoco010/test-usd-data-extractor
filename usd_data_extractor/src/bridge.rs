@@ -14,6 +14,7 @@ pub mod ffi {
         fn normals(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn uvs(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn indices(self: &BridgeSender, path: String, data: &[i32]);
+        fn face_vertex_counts(self: &BridgeSender, path: String, data: &[i32]);
         fn destroy_mesh(self: &BridgeSender, path: String);
 
         type BridgeSendEndNotifier;
@@ -88,6 +89,12 @@ impl BridgeSender {
     pub fn indices(&self, path: String, data: &[i32]) {
         let data = data.iter().map(|&i| i as u32).collect::<Vec<_>>();
         let data = BridgeData::Indices(UsdSdfPath(path), data);
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn face_vertex_counts(&self, path: String, data: &[i32]) {
+        let data = data.iter().map(|&i| i as u8).collect::<Vec<_>>();
+        let data = BridgeData::FaceVertexCount(UsdSdfPath(path), data);
         self.sender.send(data).unwrap();
     }
 

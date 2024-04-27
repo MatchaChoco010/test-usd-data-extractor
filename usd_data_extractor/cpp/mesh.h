@@ -35,7 +35,7 @@ private:
   void _SyncPoints(HdSceneDelegate* sceneDelegate);
   void _SyncNormals(HdSceneDelegate* sceneDelegate);
   void _SyncUVs(HdSceneDelegate* sceneDelegate);
-  void _SyncIndices(HdSceneDelegate* sceneDelegate);
+  void _SyncTopology(HdSceneDelegate* sceneDelegate);
 
   // This class does not support copying.
   HdBridgeMesh(const HdBridgeMesh&) = delete;

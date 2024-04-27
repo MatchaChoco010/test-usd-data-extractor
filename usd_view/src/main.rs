@@ -80,6 +80,14 @@ fn show_data(data: BridgeData) {
             }
             println!("...");
         }
+        BridgeData::FaceVertexCount(path, data) => {
+            println!("{} [FaceVertexCount], len: {}", path, data.len());
+            print!("    ");
+            for i in 0..6.min(data.len()) {
+                print!("{}, ", data[i]);
+            }
+            println!("...");
+        }
         BridgeData::DestroyMesh(path) => println!("{path} [DestroyMesh]"),
     }
 }

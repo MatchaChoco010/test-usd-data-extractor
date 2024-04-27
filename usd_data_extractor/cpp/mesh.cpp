@@ -51,7 +51,7 @@ HdBridgeMesh::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTopology) {
-    _SyncIndices(sceneDelegate);
+    _SyncTopology(sceneDelegate);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform) {
@@ -187,16 +187,21 @@ HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
 }
 
 void
-HdBridgeMesh::_SyncIndices(HdSceneDelegate* sceneDelegate)
+HdBridgeMesh::_SyncTopology(HdSceneDelegate* sceneDelegate)
 {
   rust::String path = rust::string(this->_id.GetText());
 
   HdMeshTopology topology = sceneDelegate->GetMeshTopology(_id);
-  const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
 
+  const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
   rust::Slice<const int> faceVertexIndicesSlice{
     (const int*)faceVertexIndices.data(), faceVertexIndices.size()
   };
-
   (*_sender)->indices(path, faceVertexIndicesSlice);
+
+  const VtIntArray& faceVertexCounts = topology.GetFaceVertexCounts();
+  rust::Slice<const int> faceVertexCountsSlice{
+    (const int*)faceVertexCounts.data(), faceVertexCounts.size()
+  };
+  (*_sender)->face_vertex_counts(path, faceVertexCountsSlice);
 }
