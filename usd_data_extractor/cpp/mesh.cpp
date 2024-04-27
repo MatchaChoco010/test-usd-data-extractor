@@ -90,32 +90,23 @@ HdBridgeMesh::_SyncPoints(HdSceneDelegate* sceneDelegate)
   rust::String path = rust::string(this->_id.GetText());
 
   // pointsを取得
-  VtValue value = sceneDelegate->Get(_id, HdTokens->points);
-  if (value.IsEmpty()) {
-    return;
-  }
-  if (!value.IsHolding<VtVec3fArray>()) {
-    return;
-  }
-  VtVec3fArray points = value.Get<VtVec3fArray>();
-  rust::Slice<const float> pointsSlice{ (const float*)points.data(),
-                                        points.size() * 3 };
-
-  // interpolation typeを取得
   std::vector<HdPrimvarDescriptor> primvarDescs =
     sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
-  uint8_t interpolation = 255;
   for (const HdPrimvarDescriptor& desc : primvarDescs) {
     if (desc.name == HdTokens->points) {
-      interpolation = (uint8_t)desc.interpolation;
+
+      VtValue value = sceneDelegate->Get(_id, desc.name);
+      if (!value.IsEmpty() && value.IsHolding<VtVec3fArray>()) {
+        VtVec3fArray points = value.Get<VtVec3fArray>();
+        rust::Slice<const float> pointsSlice{ (const float*)points.data(),
+                                              points.size() * 3 };
+
+        (*_sender)->points(path, pointsSlice, (uint8_t)desc.interpolation);
+      }
+
       break;
     }
   }
-  if (interpolation == 255) {
-    interpolation = (uint8_t)HdInterpolationFaceVarying;
-  }
-
-  (*_sender)->points(path, pointsSlice, interpolation);
 }
 
 void
@@ -124,32 +115,30 @@ HdBridgeMesh::_SyncNormals(HdSceneDelegate* sceneDelegate)
   rust::String path = rust::string(this->_id.GetText());
 
   // normalsを取得
-  VtValue value = sceneDelegate->Get(_id, HdTokens->normals);
-  if (value.IsEmpty()) {
-    return;
+  std::vector<HdPrimvarDescriptor> primvarDescs;
+  {
+    std::vector<HdPrimvarDescriptor> a =
+      sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
+    primvarDescs.insert(primvarDescs.end(), a.begin(), a.end());
+    std::vector<HdPrimvarDescriptor> b =
+      sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationFaceVarying);
+    primvarDescs.insert(primvarDescs.end(), b.begin(), b.end());
   }
-  if (!value.IsHolding<VtVec3fArray>()) {
-    return;
-  }
-  VtVec3fArray normals = value.Get<VtVec3fArray>();
-  rust::Slice<const float> normalsSlice{ (const float*)normals.data(),
-                                         normals.size() * 3 };
-
-  // interpolation typeを取得
-  std::vector<HdPrimvarDescriptor> primvarDescs =
-    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
-  uint8_t interpolation = 255;
   for (const HdPrimvarDescriptor& desc : primvarDescs) {
     if (desc.name == HdTokens->normals) {
-      interpolation = (uint8_t)desc.interpolation;
+
+      VtValue value = sceneDelegate->Get(_id, desc.name);
+      if (!value.IsEmpty() && value.IsHolding<VtVec3fArray>()) {
+        VtVec3fArray normals = value.Get<VtVec3fArray>();
+        rust::Slice<const float> normalsSlice{ (const float*)normals.data(),
+                                               normals.size() * 3 };
+
+        (*_sender)->normals(path, normalsSlice, (uint8_t)desc.interpolation);
+      }
+
       break;
     }
   }
-  if (interpolation == 255) {
-    interpolation = (uint8_t)HdInterpolationFaceVarying;
-  }
-
-  (*_sender)->normals(path, normalsSlice, interpolation);
 }
 
 void
@@ -159,31 +148,23 @@ HdBridgeMesh::_SyncUVs(HdSceneDelegate* sceneDelegate)
 
   // uvsを取得
   TfToken uvPrimvarName("st");
-  VtValue value = sceneDelegate->Get(_id, uvPrimvarName);
-  if (value.IsEmpty()) {
-    return;
-  }
-  if (!value.IsHolding<VtVec2fArray>()) {
-    return;
-  }
-  VtVec2fArray uvs = value.Get<VtVec2fArray>();
-  rust::Slice<const float> uvsSlice{ (const float*)uvs.data(), uvs.size() * 2 };
-
-  // interpolation typeを取得
   std::vector<HdPrimvarDescriptor> primvarDescs =
-    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationVertex);
-  uint8_t interpolation = 255;
+    sceneDelegate->GetPrimvarDescriptors(_id, HdInterpolationFaceVarying);
   for (const HdPrimvarDescriptor& desc : primvarDescs) {
     if (desc.name == uvPrimvarName) {
-      interpolation = (uint8_t)desc.interpolation;
+
+      VtValue value = sceneDelegate->Get(_id, desc.name);
+      if (!value.IsEmpty() && value.IsHolding<VtVec2fArray>()) {
+        VtVec2fArray uvs = value.Get<VtVec2fArray>();
+        rust::Slice<const float> uvsSlice{ (const float*)uvs.data(),
+                                           uvs.size() * 2 };
+
+        (*_sender)->uvs(path, uvsSlice, (uint8_t)desc.interpolation);
+      }
+
       break;
     }
   }
-  if (interpolation == 255) {
-    interpolation = (uint8_t)HdInterpolationFaceVarying;
-  }
-
-  (*_sender)->uvs(path, uvsSlice, interpolation);
 }
 
 void
@@ -197,7 +178,7 @@ HdBridgeMesh::_SyncTopology(HdSceneDelegate* sceneDelegate)
   rust::Slice<const int> faceVertexIndicesSlice{
     (const int*)faceVertexIndices.data(), faceVertexIndices.size()
   };
-  (*_sender)->indices(path, faceVertexIndicesSlice);
+  (*_sender)->face_vertex_indices(path, faceVertexIndicesSlice);
 
   const VtIntArray& faceVertexCounts = topology.GetFaceVertexCounts();
   rust::Slice<const int> faceVertexCountsSlice{

@@ -13,7 +13,7 @@ pub mod ffi {
         fn points(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn normals(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
         fn uvs(self: &BridgeSender, path: String, data: &[f32], interpolation: u8);
-        fn indices(self: &BridgeSender, path: String, data: &[i32]);
+        fn face_vertex_indices(self: &BridgeSender, path: String, data: &[i32]);
         fn face_vertex_counts(self: &BridgeSender, path: String, data: &[i32]);
         fn destroy_mesh(self: &BridgeSender, path: String);
 
@@ -86,9 +86,9 @@ impl BridgeSender {
         self.sender.send(data).unwrap();
     }
 
-    pub fn indices(&self, path: String, data: &[i32]) {
+    pub fn face_vertex_indices(&self, path: String, data: &[i32]) {
         let data = data.iter().map(|&i| i as u32).collect::<Vec<_>>();
-        let data = BridgeData::Indices(UsdSdfPath(path), data);
+        let data = BridgeData::FaceVertexIndices(UsdSdfPath(path), data);
         self.sender.send(data).unwrap();
     }
 

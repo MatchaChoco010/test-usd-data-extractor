@@ -72,7 +72,7 @@ fn show_data(data: BridgeData) {
             }
             println!("...");
         }
-        BridgeData::Indices(path, data) => {
+        BridgeData::FaceVertexIndices(path, data) => {
             println!("{} [Indices], len: {}", path, data.len());
             print!("    ");
             for i in 0..6.min(data.len()) {
