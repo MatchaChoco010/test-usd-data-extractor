@@ -96,6 +96,20 @@ impl From<Box<bridge::SphereLightData>> for SphereLightData {
 }
 
 #[derive(Debug, Clone)]
+pub struct CameraData {
+    pub focal_length: f32,
+    pub vertical_aperture: f32,
+}
+impl From<Box<bridge::CameraData>> for CameraData {
+    fn from(data: Box<bridge::CameraData>) -> Self {
+        Self {
+            focal_length: data.focal_length,
+            vertical_aperture: data.vertical_aperture,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UsdSdfPath(pub String);
 impl Display for UsdSdfPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -116,6 +130,9 @@ pub enum BridgeData {
     CreateSphereLight(UsdSdfPath),
     SphereLightData(UsdSdfPath, SphereLightData),
     DestroySphereLight(UsdSdfPath),
+    CreateCamera(UsdSdfPath),
+    CameraData(UsdSdfPath, CameraData),
+    DestroyCamera(UsdSdfPath),
 }
 
 pub struct UsdDataExtractor {

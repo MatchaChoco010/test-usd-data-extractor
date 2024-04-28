@@ -2,6 +2,7 @@
 #define BRIDGE_RENDER_DELEGATE_H
 
 #include "bridgeSender.h"
+#include "camera.h"
 #include "distantLight.h"
 #include "mesh.h"
 #include "pxr/base/tf/diagnostic.h"

@@ -27,6 +27,11 @@ pub mod ffi {
         fn set_cone_angle(self: &mut SphereLightData, angle: f32);
         fn set_cone_softness(self: &mut SphereLightData, softness: f32);
 
+        type CameraData;
+        fn new_camera_data() -> Box<CameraData>;
+        fn set_focal_length(self: &mut CameraData, focal_length: f32);
+        fn set_vertical_aperture(self: &mut CameraData, vertical_aperture: f32);
+
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
@@ -40,6 +45,9 @@ pub mod ffi {
         fn create_sphere_light(self: &BridgeSender, path: String);
         fn sphere_light_data(self: &BridgeSender, path: String, data: Box<SphereLightData>);
         fn destroy_sphere_light(self: &BridgeSender, path: String);
+        fn create_camera(self: &BridgeSender, path: String);
+        fn camera_data(self: &BridgeSender, path: String, data: Box<CameraData>);
+        fn destroy_camera(self: &BridgeSender, path: String);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -187,6 +195,27 @@ impl SphereLightData {
     }
 }
 
+pub fn new_camera_data() -> Box<CameraData> {
+    Box::new(CameraData {
+        focal_length: 16.0,
+        vertical_aperture: 23.8,
+    })
+}
+
+pub struct CameraData {
+    pub focal_length: f32,
+    pub vertical_aperture: f32,
+}
+impl CameraData {
+    pub fn set_focal_length(&mut self, focal_length: f32) {
+        self.focal_length = focal_length;
+    }
+
+    pub fn set_vertical_aperture(&mut self, vertical_aperture: f32) {
+        self.vertical_aperture = vertical_aperture;
+    }
+}
+
 pub struct BridgeSender {
     sender: Sender<BridgeData>,
 }
@@ -256,6 +285,21 @@ impl BridgeSender {
 
     pub fn destroy_sphere_light(&self, path: String) {
         let data = BridgeData::DestroySphereLight(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_camera(&self, path: String) {
+        let data = BridgeData::CreateCamera(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn camera_data(&self, path: String, data: Box<CameraData>) {
+        let data = BridgeData::CameraData(UsdSdfPath(path), data.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_camera(&self, path: String) {
+        let data = BridgeData::DestroyCamera(UsdSdfPath(path));
         self.sender.send(data).unwrap();
     }
 }

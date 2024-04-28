@@ -5,8 +5,9 @@ TfTokenVector SUPPORTED_RPRIM_TYPES = {
   HdPrimTypeTokens->mesh,
 };
 TfTokenVector SUPPORTED_SPRIM_TYPES = {
-  HdPrimTypeTokens->camera,      HdPrimTypeTokens->material,
-  HdPrimTypeTokens->light,       HdPrimTypeTokens->distantLight,
+  HdPrimTypeTokens->camera,
+  HdPrimTypeTokens->material,
+  HdPrimTypeTokens->distantLight,
   HdPrimTypeTokens->sphereLight,
 };
 TfTokenVector SUPPORTED_BPRIM_TYPES = {};
@@ -93,7 +94,7 @@ HdBridgeRenderDelegate::CreateSprim(TfToken const& typeId,
                                     SdfPath const& sprimId)
 {
   if (typeId == HdPrimTypeTokens->camera) {
-    return new HdCamera(sprimId);
+    return new HdBridgeCamera(sprimId, _sender);
   }
   if (typeId == HdPrimTypeTokens->material) {
     // return new HdMaterial(sprimId);

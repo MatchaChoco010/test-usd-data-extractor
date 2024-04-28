@@ -53,11 +53,26 @@ pub struct SphereLight {
 }
 
 #[derive(Debug)]
+pub struct Camera {
+    pub view_matrix: glam::Mat4,
+    pub fovy: f32,
+}
+impl Camera {
+    pub fn new() -> Self {
+        Self {
+            view_matrix: glam::Mat4::IDENTITY,
+            fovy: 60.0_f32.to_radians(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Scene {
     pub range: Option<TimeCodeRange>,
     pub meshes: HashMap<String, Mesh>,
     pub sphere_lights: HashMap<String, SphereLight>,
     pub distant_lights: HashMap<String, DistantLight>,
+    pub camera: Camera,
 }
 
 #[derive(Debug)]
@@ -98,6 +113,13 @@ struct UsdSceneSphereLight {
     cone_softness: Option<f32>,
 }
 
+#[derive(Debug)]
+struct UsdCamera {
+    transform_matrix: [f32; 16],
+    focal_length: f32,
+    vertical_aperture: f32,
+}
+
 enum UsdSceneExtractorMessage {
     LoadUsd(String),
     SetTimeCode(i64),
@@ -121,6 +143,7 @@ struct UsdSceneExtractorTask {
     meshes: HashMap<String, UsdSceneMesh>,
     sphere_lights: HashMap<String, UsdSceneSphereLight>,
     distant_lights: HashMap<String, UsdSceneDistantLight>,
+    cameras: HashMap<String, UsdCamera>,
 }
 impl UsdSceneExtractorTask {
     // 裏でusd読み込みのために走っているスレッドのエントリーポイント。
@@ -141,6 +164,7 @@ impl UsdSceneExtractorTask {
                 meshes: HashMap::new(),
                 sphere_lights: HashMap::new(),
                 distant_lights: HashMap::new(),
+                cameras: HashMap::new(),
             };
 
             loop {
@@ -195,6 +219,7 @@ impl UsdSceneExtractorTask {
             meshes: HashMap::new(),
             distant_lights: HashMap::new(),
             sphere_lights: HashMap::new(),
+            camera: Camera::new(),
         };
         sync_items.render_settings = RenderSettings {
             settings_paths: Vec::new(),
@@ -235,6 +260,9 @@ impl UsdSceneExtractorTask {
                     if let Some(light) = self.sphere_lights.get_mut(&path.0) {
                         light.transform_matrix = Some(matrix);
                         light.dirty_transform = true;
+                    }
+                    if let Some(camera) = self.cameras.get_mut(&path.0) {
+                        camera.transform_matrix = matrix;
                     }
                 }
                 BridgeData::CreateMesh(path) => {
@@ -324,6 +352,25 @@ impl UsdSceneExtractorTask {
                 }
                 BridgeData::DestroySphereLight(path) => {
                     self.sphere_lights.remove(&path.0);
+                }
+                BridgeData::CreateCamera(path) => {
+                    self.cameras.insert(
+                        path.0,
+                        UsdCamera {
+                            transform_matrix: [0.0; 16],
+                            focal_length: 16.0,
+                            vertical_aperture: 23.8,
+                        },
+                    );
+                }
+                BridgeData::CameraData(path, data) => {
+                    if let Some(camera) = self.cameras.get_mut(&path.0) {
+                        camera.focal_length = data.focal_length;
+                        camera.vertical_aperture = data.vertical_aperture;
+                    }
+                }
+                BridgeData::DestroyCamera(path) => {
+                    self.cameras.remove(&path.0);
                 }
                 _ => (),
             }
@@ -759,7 +806,32 @@ impl UsdSceneExtractorTask {
             Err(_) => None,
         };
 
-        println!("Active Camera: {:?}", camera_path);
+        // アクティブなカメラの情報を取得する
+        let camera = match &camera_path {
+            Some(path) => self.cameras.get(path),
+            None => None,
+        };
+
+        // カメラの情報をシーンに反映する
+        match camera {
+            Some(camera) => {
+                let transform = glam::Mat4::from_cols_array(&camera.transform_matrix);
+                let position = transform.transform_point3(Vec3::ZERO);
+                let direction = transform.transform_vector3(Vec3::NEG_Z).normalize();
+                scene.camera.view_matrix =
+                    glam::Mat4::look_at_rh(position, position + direction, Vec3::Y);
+                let fovy = 2.0 * (camera.vertical_aperture / 2.0 / camera.focal_length).atan();
+                scene.camera.fovy = fovy;
+            }
+            None => {
+                scene.camera.view_matrix = glam::Mat4::look_at_rh(
+                    Vec3::new(0.0, 1.8, 5.0),
+                    Vec3::new(0.0, 0.8, 0.0),
+                    Vec3::Y,
+                );
+                scene.camera.fovy = 60.0_f32.to_radians();
+            }
+        }
     }
 }
 
@@ -775,6 +847,7 @@ impl SceneLoader {
             meshes: HashMap::new(),
             sphere_lights: HashMap::new(),
             distant_lights: HashMap::new(),
+            camera: Camera::new(),
         };
         let render_settings = RenderSettings {
             settings_paths: Vec::new(),
