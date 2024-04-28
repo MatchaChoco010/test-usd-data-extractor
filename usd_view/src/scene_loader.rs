@@ -10,22 +10,26 @@ use usd_data_extractor::*;
 
 use crate::renderer::{Model, Vertex};
 
+#[derive(Debug)]
 pub struct TimeCodeRange {
     pub start: i64,
     pub end: i64,
 }
 
+#[derive(Debug)]
 pub struct Mesh {
     pub vertex_count: u32,
     pub vertex_buffer: Option<wgpu::Buffer>,
     pub model_buffer: wgpu::Buffer,
 }
 
+#[derive(Debug)]
 pub struct Scene {
     pub range: Option<TimeCodeRange>,
     pub meshes: HashMap<String, Mesh>,
 }
 
+#[derive(Debug)]
 struct UsdSceneMesh {
     dirty_transform: bool,
     transform_matrix: Option<[f32; 16]>,
@@ -41,12 +45,36 @@ struct UsdSceneMesh {
     face_vertex_counts: Option<Vec<u32>>,
 }
 
+#[derive(Debug)]
+struct UsdSceneDistantLight {
+    dirty_transform: bool,
+    transform_matrix: Option<[f32; 16]>,
+    dirty_params: bool,
+    intensity: Option<f32>,
+    color: Option<[f32; 3]>,
+}
+
+#[derive(Debug)]
+struct UsdSceneSphereLight {
+    dirty_transform: bool,
+    transform_matrix: Option<[f32; 16]>,
+    dirty_params: bool,
+    is_spot: bool,
+    intensity: Option<f32>,
+    color: Option<[f32; 3]>,
+    radius: Option<f32>,
+    cone_angle: Option<f32>,
+    cone_softness: Option<f32>,
+}
+
 struct UsdSceneExtractorTask {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     usd_data_extractor: Option<UsdDataExtractor>,
     scene: Arc<Mutex<Scene>>,
     meshes: HashMap<String, UsdSceneMesh>,
+    sphere_lights: HashMap<String, UsdSceneSphereLight>,
+    distant_lights: HashMap<String, UsdSceneDistantLight>,
 }
 impl UsdSceneExtractorTask {
     pub fn run(
@@ -64,6 +92,8 @@ impl UsdSceneExtractorTask {
                 usd_data_extractor: None,
                 scene,
                 meshes: HashMap::new(),
+                sphere_lights: HashMap::new(),
+                distant_lights: HashMap::new(),
             };
 
             loop {
@@ -116,6 +146,20 @@ impl UsdSceneExtractorTask {
                         end: end as i64,
                     });
                 }
+                BridgeData::TransformMatrix(path, matrix) => {
+                    if let Some(mesh) = self.meshes.get_mut(&path.0) {
+                        mesh.transform_matrix = Some(matrix);
+                        mesh.dirty_transform = true;
+                    }
+                    if let Some(light) = self.distant_lights.get_mut(&path.0) {
+                        light.transform_matrix = Some(matrix);
+                        light.dirty_transform = true;
+                    }
+                    if let Some(light) = self.sphere_lights.get_mut(&path.0) {
+                        light.transform_matrix = Some(matrix);
+                        light.dirty_transform = true;
+                    }
+                }
                 BridgeData::CreateMesh(path) => {
                     self.meshes.insert(
                         path.0,
@@ -135,12 +179,6 @@ impl UsdSceneExtractorTask {
                         },
                     );
                 }
-                BridgeData::TransformMatrix(path, matrix) => {
-                    if let Some(mesh) = self.meshes.get_mut(&path.0) {
-                        mesh.transform_matrix = Some(matrix);
-                        mesh.dirty_transform = true;
-                    }
-                }
                 BridgeData::MeshData(path, data) => {
                     if let Some(mesh) = self.meshes.get_mut(&path.0) {
                         mesh.left_handed = data.left_handed;
@@ -158,6 +196,60 @@ impl UsdSceneExtractorTask {
                 BridgeData::DestroyMesh(path) => {
                     self.meshes.remove(&path.0);
                 }
+                BridgeData::CreateDistantLight(path) => {
+                    self.distant_lights.insert(
+                        path.0,
+                        UsdSceneDistantLight {
+                            dirty_transform: true,
+                            transform_matrix: None,
+                            dirty_params: true,
+                            intensity: None,
+                            color: None,
+                        },
+                    );
+                }
+                BridgeData::DistantLightData(path, data) => {
+                    if let Some(light) = self.distant_lights.get_mut(&path.0) {
+                        light.intensity = Some(data.intensity);
+                        light.color = Some(data.color);
+                        light.dirty_params = true;
+                        println!("Distant light data: {light:?}");
+                    }
+                }
+                BridgeData::DestroyDistantLight(path) => {
+                    self.distant_lights.remove(&path.0);
+                }
+                BridgeData::CreateSphereLight(path) => {
+                    self.sphere_lights.insert(
+                        path.0,
+                        UsdSceneSphereLight {
+                            dirty_transform: true,
+                            transform_matrix: None,
+                            dirty_params: true,
+                            is_spot: false,
+                            intensity: None,
+                            color: None,
+                            radius: None,
+                            cone_angle: None,
+                            cone_softness: None,
+                        },
+                    );
+                }
+                BridgeData::SphereLightData(path, data) => {
+                    if let Some(light) = self.sphere_lights.get_mut(&path.0) {
+                        light.intensity = Some(data.intensity);
+                        light.color = Some(data.color);
+                        light.radius = Some(data.radius);
+                        light.is_spot = data.cone_angle.is_some();
+                        light.cone_angle = data.cone_angle;
+                        light.cone_softness = data.cone_softness;
+                        light.dirty_params = true;
+                        println!("Sphere light data:: {light:?}");
+                    }
+                }
+                BridgeData::DestroySphereLight(path) => {
+                    self.sphere_lights.remove(&path.0);
+                }
                 _ => (),
             }
         }
@@ -167,7 +259,10 @@ impl UsdSceneExtractorTask {
 
     fn sync_scene(&mut self) {
         let mut scene = self.scene.lock().unwrap();
+        self.sync_mesh(&mut scene);
+    }
 
+    fn sync_mesh(&self, scene: &mut Scene) {
         // remove deleted meshes
         scene
             .meshes

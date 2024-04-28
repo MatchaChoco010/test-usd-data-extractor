@@ -5,9 +5,9 @@ TfTokenVector SUPPORTED_RPRIM_TYPES = {
   HdPrimTypeTokens->mesh,
 };
 TfTokenVector SUPPORTED_SPRIM_TYPES = {
-  HdPrimTypeTokens->camera,
-  HdPrimTypeTokens->material,
-  HdPrimTypeTokens->distantLight,
+  HdPrimTypeTokens->camera,      HdPrimTypeTokens->material,
+  HdPrimTypeTokens->light,       HdPrimTypeTokens->distantLight,
+  HdPrimTypeTokens->sphereLight,
 };
 TfTokenVector SUPPORTED_BPRIM_TYPES = {};
 
@@ -99,7 +99,10 @@ HdBridgeRenderDelegate::CreateSprim(TfToken const& typeId,
     // return new HdMaterial(sprimId);
   }
   if (typeId == HdPrimTypeTokens->distantLight) {
-    // return new HdDistantLight(sprimId);
+    return new HdBridgeDistantLight(sprimId, _sender);
+  }
+  if (typeId == HdPrimTypeTokens->sphereLight) {
+    return new HdBridgeSphereLight(sprimId, _sender);
   }
 
   TF_CODING_ERROR(
@@ -117,7 +120,10 @@ HdBridgeRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
     // return new HdMaterial(SdfPath::EmptyPath());
   }
   if (typeId == HdPrimTypeTokens->distantLight) {
-    // return new HdDistantLight(SdfPath::EmptyPath());
+    return new HdBridgeDistantLight(SdfPath::EmptyPath(), _sender);
+  }
+  if (typeId == HdPrimTypeTokens->sphereLight) {
+    return new HdBridgeSphereLight(SdfPath::EmptyPath(), _sender);
   }
 
   TF_CODING_ERROR("Creating unknown fallback sprim type=%s", typeId.GetText());

@@ -14,13 +14,33 @@ pub mod ffi {
         fn set_face_vertex_indices(self: &mut MeshData, data: &[u64]);
         fn set_face_vertex_counts(self: &mut MeshData, data: &[u32]);
 
+        type DistantLightData;
+        fn new_distant_light_data() -> Box<DistantLightData>;
+        fn set_intensity(self: &mut DistantLightData, intensity: f32);
+        fn set_color(self: &mut DistantLightData, r: f32, g: f32, b: f32);
+        fn set_angle(self: &mut DistantLightData, angle: f32);
+
+        type SphereLightData;
+        fn new_sphere_light_data() -> Box<SphereLightData>;
+        fn set_intensity(self: &mut SphereLightData, intensity: f32);
+        fn set_color(self: &mut SphereLightData, r: f32, g: f32, b: f32);
+        fn set_radius(self: &mut SphereLightData, radius: f32);
+        fn set_cone_angle(self: &mut SphereLightData, angle: f32);
+        fn set_cone_softness(self: &mut SphereLightData, softness: f32);
+
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
-        fn create_mesh(self: &BridgeSender, path: String);
         fn transform_matrix(self: &BridgeSender, path: String, matrix: &[f64]);
+        fn create_mesh(self: &BridgeSender, path: String);
         fn mesh_data(self: &BridgeSender, path: String, data: Box<MeshData>);
         fn destroy_mesh(self: &BridgeSender, path: String);
+        fn create_distant_light(self: &BridgeSender, path: String);
+        fn distant_light_data(self: &BridgeSender, path: String, data: Box<DistantLightData>);
+        fn destroy_distant_light(self: &BridgeSender, path: String);
+        fn create_sphere_light(self: &BridgeSender, path: String);
+        fn sphere_light_data(self: &BridgeSender, path: String, data: Box<SphereLightData>);
+        fn destroy_sphere_light(self: &BridgeSender, path: String);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -95,6 +115,72 @@ impl MeshData {
     }
 }
 
+pub fn new_distant_light_data() -> Box<DistantLightData> {
+    Box::new(DistantLightData {
+        intensity: 0.0,
+        color: [0.0, 0.0, 0.0],
+        angle: None,
+    })
+}
+
+pub struct DistantLightData {
+    pub intensity: f32,
+    pub color: [f32; 3],
+    pub angle: Option<f32>,
+}
+impl DistantLightData {
+    pub fn set_intensity(&mut self, intensity: f32) {
+        self.intensity = intensity;
+    }
+
+    pub fn set_color(&mut self, r: f32, g: f32, b: f32) {
+        self.color = [r, g, b];
+    }
+
+    pub fn set_angle(&mut self, angle: f32) {
+        self.angle = Some(angle);
+    }
+}
+
+pub fn new_sphere_light_data() -> Box<SphereLightData> {
+    Box::new(SphereLightData {
+        intensity: 0.0,
+        color: [0.0, 0.0, 0.0],
+        radius: 0.0,
+        cone_angle: None,
+        cone_softness: None,
+    })
+}
+
+pub struct SphereLightData {
+    pub intensity: f32,
+    pub color: [f32; 3],
+    pub radius: f32,
+    pub cone_angle: Option<f32>,
+    pub cone_softness: Option<f32>,
+}
+impl SphereLightData {
+    pub fn set_intensity(&mut self, intensity: f32) {
+        self.intensity = intensity;
+    }
+
+    pub fn set_color(&mut self, r: f32, g: f32, b: f32) {
+        self.color = [r, g, b];
+    }
+
+    pub fn set_radius(&mut self, radius: f32) {
+        self.radius = radius;
+    }
+
+    pub fn set_cone_angle(&mut self, angle: f32) {
+        self.cone_angle = Some(angle);
+    }
+
+    pub fn set_cone_softness(&mut self, softness: f32) {
+        self.cone_softness = Some(softness);
+    }
+}
+
 pub struct BridgeSender {
     sender: Sender<BridgeData>,
 }
@@ -113,17 +199,17 @@ impl BridgeSender {
         self.sender.send(data).unwrap();
     }
 
-    pub fn create_mesh(&self, path: String) {
-        let data = BridgeData::CreateMesh(UsdSdfPath(path));
-        self.sender.send(data).unwrap();
-    }
-
     pub fn transform_matrix(&self, path: String, matrix: &[f64]) {
         let mut data = [0.0; 16];
         for i in 0..16 {
             data[i] = matrix[i] as f32;
         }
         let data = BridgeData::TransformMatrix(UsdSdfPath(path), data);
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_mesh(&self, path: String) {
+        let data = BridgeData::CreateMesh(UsdSdfPath(path));
         self.sender.send(data).unwrap();
     }
 
@@ -134,6 +220,36 @@ impl BridgeSender {
 
     pub fn destroy_mesh(&self, path: String) {
         let data = BridgeData::DestroyMesh(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_distant_light(&self, path: String) {
+        let data = BridgeData::CreateDistantLight(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn distant_light_data(&self, path: String, data: Box<DistantLightData>) {
+        let data = BridgeData::DistantLightData(UsdSdfPath(path), data.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_distant_light(&self, path: String) {
+        let data = BridgeData::DestroyDistantLight(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_sphere_light(&self, path: String) {
+        let data = BridgeData::CreateSphereLight(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn sphere_light_data(&self, path: String, data: Box<SphereLightData>) {
+        let data = BridgeData::SphereLightData(UsdSdfPath(path), data.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_sphere_light(&self, path: String) {
+        let data = BridgeData::DestroySphereLight(UsdSdfPath(path));
         self.sender.send(data).unwrap();
     }
 }

@@ -2,6 +2,7 @@
 #define BRIDGE_RENDER_DELEGATE_H
 
 #include "bridgeSender.h"
+#include "distantLight.h"
 #include "mesh.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -14,6 +15,7 @@
 #include "pxr/imaging/hd/sprim.h"
 #include "pxr/pxr.h"
 #include "rust/cxx.h"
+#include "sphereLight.h"
 #include <iostream>
 #include <memory>
 

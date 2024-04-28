@@ -28,7 +28,6 @@ impl From<u8> for Interpolation {
 }
 
 #[derive(Debug, Clone)]
-
 pub struct MeshData {
     pub left_handed: bool,
     pub points_data: Vec<f32>,
@@ -63,6 +62,40 @@ impl From<Box<bridge::MeshData>> for MeshData {
 }
 
 #[derive(Debug, Clone)]
+pub struct DistantLightData {
+    pub intensity: f32,
+    pub color: [f32; 3],
+}
+impl From<Box<bridge::DistantLightData>> for DistantLightData {
+    fn from(data: Box<bridge::DistantLightData>) -> Self {
+        Self {
+            intensity: data.intensity,
+            color: data.color,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SphereLightData {
+    pub intensity: f32,
+    pub color: [f32; 3],
+    pub radius: f32,
+    pub cone_angle: Option<f32>,
+    pub cone_softness: Option<f32>,
+}
+impl From<Box<bridge::SphereLightData>> for SphereLightData {
+    fn from(data: Box<bridge::SphereLightData>) -> Self {
+        Self {
+            intensity: data.intensity,
+            color: data.color,
+            radius: data.radius,
+            cone_angle: data.cone_angle,
+            cone_softness: data.cone_softness,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UsdSdfPath(pub String);
 impl Display for UsdSdfPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -73,10 +106,16 @@ impl Display for UsdSdfPath {
 pub enum BridgeData {
     Message(String),
     TimeCodeRange(f64, f64),
-    CreateMesh(UsdSdfPath),
     TransformMatrix(UsdSdfPath, [f32; 16]),
+    CreateMesh(UsdSdfPath),
     MeshData(UsdSdfPath, MeshData),
     DestroyMesh(UsdSdfPath),
+    CreateDistantLight(UsdSdfPath),
+    DistantLightData(UsdSdfPath, DistantLightData),
+    DestroyDistantLight(UsdSdfPath),
+    CreateSphereLight(UsdSdfPath),
+    SphereLightData(UsdSdfPath, SphereLightData),
+    DestroySphereLight(UsdSdfPath),
 }
 
 pub struct UsdDataExtractor {
