@@ -144,9 +144,8 @@ impl UsdDataExtractor {
         data
     }
 
-    pub fn get_render_settings_paths(&mut self) -> Vec<String> {
-        let inner = self.inner.pin_mut();
-        inner.get_render_settings_paths()
+    pub fn get_render_settings_paths(&self) -> Vec<String> {
+        self.inner.get_render_settings_paths()
     }
 
     pub fn set_render_settings_path(&mut self, path: &str) -> Result<(), String> {
@@ -161,9 +160,8 @@ impl UsdDataExtractor {
         inner.clear_render_settings_path();
     }
 
-    pub fn get_render_product_paths(&mut self) -> Result<Vec<String>, String> {
-        let inner = self.inner.pin_mut();
-        inner
+    pub fn get_render_product_paths(&self) -> Result<Vec<String>, String> {
+        self.inner
             .get_render_product_paths()
             .map_err(|e| String::from(e.what()))
     }
@@ -180,9 +178,8 @@ impl UsdDataExtractor {
         inner.clear_render_product_path();
     }
 
-    pub fn get_active_camera_path(&mut self) -> Result<String, String> {
-        let inner = self.inner.pin_mut();
-        inner
+    pub fn get_active_camera_path(&self) -> Result<String, String> {
+        self.inner
             .get_active_camera_path()
             .map_err(|e| String::from(e.what()))
     }

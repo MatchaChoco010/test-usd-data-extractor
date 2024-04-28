@@ -57,7 +57,7 @@ BridgeUsdDataExtractor::extract(rust::Box<BridgeSendEndNotifier> notifier,
 }
 
 rust::Vec<rust::String>
-BridgeUsdDataExtractor::get_render_settings_paths()
+BridgeUsdDataExtractor::get_render_settings_paths() const
 {
   rust::Vec<rust::String> result;
   for (const UsdPrim& prim : _stage->GetPseudoRoot().GetDescendants()) {
@@ -91,7 +91,7 @@ BridgeUsdDataExtractor::clear_render_settings_path()
 }
 
 rust::Vec<rust::String>
-BridgeUsdDataExtractor::get_render_product_paths()
+BridgeUsdDataExtractor::get_render_product_paths() const
 {
   if (_renderSettingsPath.IsEmpty()) {
     throw std::runtime_error("RenderSettings path is empty");
@@ -135,7 +135,7 @@ BridgeUsdDataExtractor::clear_render_product_path()
 }
 
 rust::String
-BridgeUsdDataExtractor::get_active_camera_path()
+BridgeUsdDataExtractor::get_active_camera_path() const
 {
   if (_renderProductPath.IsEmpty()) {
     throw std::runtime_error("RenderProduct path is empty");

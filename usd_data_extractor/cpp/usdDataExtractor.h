@@ -30,13 +30,13 @@ public:
   virtual ~BridgeUsdDataExtractor();
 
   void extract(rust::Box<BridgeSendEndNotifier> notifier, double timeCode);
-  rust::Vec<rust::String> get_render_settings_paths();
+  rust::Vec<rust::String> get_render_settings_paths() const;
   void set_render_settings_path(rust::Str path);
   void clear_render_settings_path();
-  rust::Vec<rust::String> get_render_product_paths();
+  rust::Vec<rust::String> get_render_product_paths() const;
   void set_render_product_path(rust::Str path);
   void clear_render_product_path();
-  rust::String get_active_camera_path();
+  rust::String get_active_camera_path() const;
 
 private:
   BridgeSenderSharedPtr _sender;

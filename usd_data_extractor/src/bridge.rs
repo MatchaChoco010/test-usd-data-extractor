@@ -57,19 +57,19 @@ pub mod ffi {
             notifier: Box<BridgeSendEndNotifier>,
             time_code: f64,
         );
-        fn get_render_settings_paths(self: Pin<&mut BridgeUsdDataExtractor>) -> Vec<String>;
+        fn get_render_settings_paths(self: &BridgeUsdDataExtractor) -> Vec<String>;
         fn set_render_settings_path(
             self: Pin<&mut BridgeUsdDataExtractor>,
             path: &str,
         ) -> Result<()>;
         fn clear_render_settings_path(self: Pin<&mut BridgeUsdDataExtractor>);
-        fn get_render_product_paths(self: Pin<&mut BridgeUsdDataExtractor>) -> Result<Vec<String>>;
+        fn get_render_product_paths(self: &BridgeUsdDataExtractor) -> Result<Vec<String>>;
         fn set_render_product_path(
             self: Pin<&mut BridgeUsdDataExtractor>,
             path: &str,
         ) -> Result<()>;
         fn clear_render_product_path(self: Pin<&mut BridgeUsdDataExtractor>);
-        fn get_active_camera_path(self: Pin<&mut BridgeUsdDataExtractor>) -> Result<String>;
+        fn get_active_camera_path(self: &BridgeUsdDataExtractor) -> Result<String>;
     }
 }
 
