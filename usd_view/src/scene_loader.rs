@@ -11,6 +11,16 @@ use usd_data_extractor::*;
 use crate::renderer::{Model, Vertex};
 
 #[derive(Debug)]
+pub struct RenderSettings {
+    pub settings_paths: Vec<String>,
+    pub product_paths: Vec<String>,
+    pub current_settings_path: Option<String>,
+    pub next_settings_path: Option<Option<String>>,
+    pub current_product_path: Option<String>,
+    pub next_product_path: Option<Option<String>>,
+}
+
+#[derive(Debug)]
 pub struct TimeCodeRange {
     pub start: i64,
     pub end: i64,
@@ -88,30 +98,46 @@ struct UsdSceneSphereLight {
     cone_softness: Option<f32>,
 }
 
+enum UsdSceneExtractorMessage {
+    LoadUsd(String),
+    SetTimeCode(i64),
+    SyncRenderSettings,
+    Stop,
+}
+
+struct SyncItems {
+    scene: Scene,
+    render_settings: RenderSettings,
+}
+
 struct UsdSceneExtractorTask {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
+
     usd_data_extractor: Option<UsdDataExtractor>,
-    scene: Arc<Mutex<Scene>>,
+
+    sync_items: Arc<Mutex<SyncItems>>,
+
     meshes: HashMap<String, UsdSceneMesh>,
     sphere_lights: HashMap<String, UsdSceneSphereLight>,
     distant_lights: HashMap<String, UsdSceneDistantLight>,
 }
 impl UsdSceneExtractorTask {
+    // 裏でusd読み込みのために走っているスレッドのエントリーポイント。
+    // スレッドでは無限ループ内で外部からのメッセージを監視し、、
+    // それぞれのメッセージが来たらload_usd, set_time_code, stopを呼び出す。
     pub fn run(
         device: Arc<wgpu::Device>,
         queue: Arc<wgpu::Queue>,
-        scene: Arc<Mutex<Scene>>,
-        open_usd_receiver: Receiver<String>,
-        time_code_receiver: Receiver<i64>,
-        stop_receiver: Receiver<()>,
+        sync_items: Arc<Mutex<SyncItems>>,
+        receiver: Receiver<UsdSceneExtractorMessage>,
     ) -> std::thread::JoinHandle<()> {
         std::thread::spawn(move || {
             let mut task = Self {
                 device,
                 queue,
                 usd_data_extractor: None,
-                scene,
+                sync_items,
                 meshes: HashMap::new(),
                 sphere_lights: HashMap::new(),
                 distant_lights: HashMap::new(),
@@ -119,41 +145,69 @@ impl UsdSceneExtractorTask {
 
             loop {
                 let mut filename = None;
-                while let Ok(file) = open_usd_receiver.try_recv() {
-                    filename = Some(file);
+                let mut time_code = None;
+                let mut sync_flag = false;
+                while let Ok(message) = receiver.recv() {
+                    match message {
+                        UsdSceneExtractorMessage::LoadUsd(file) => {
+                            filename = Some(file);
+                            break;
+                        }
+                        UsdSceneExtractorMessage::SetTimeCode(tc) => {
+                            time_code = Some(tc);
+                            break;
+                        }
+                        UsdSceneExtractorMessage::SyncRenderSettings => {
+                            sync_flag = true;
+                            break;
+                        }
+                        UsdSceneExtractorMessage::Stop => {
+                            return;
+                        }
+                    }
                 }
+
                 if let Some(filename) = filename {
                     task.load_usd(&filename);
                 }
 
-                let mut time_code = None;
-                while let Ok(tc) = time_code_receiver.try_recv() {
-                    time_code = Some(tc);
-                }
                 if let Some(time_code) = time_code {
                     task.set_time_code(time_code);
+                    sync_flag = true;
                 }
 
-                if stop_receiver.try_recv().is_ok() {
-                    break;
+                if sync_flag {
+                    task.sync_scene();
                 }
             }
         })
     }
 
+    // 裏でusd読み込みのために走っているスレッドで、USDファイルのロードボタンが押されていたら呼び出されるメソッド。
+    // 新しくUsdDataExtractorを作成し、syncしているシーン情報などを初期化する。
     fn load_usd(&mut self, filename: &str) {
-        let mut scene = self.scene.lock().unwrap();
+        let mut sync_items = self.sync_items.lock().unwrap();
         self.usd_data_extractor = UsdDataExtractor::new(filename)
             .inspect_err(|_| eprintln!("Failed to open USD file: {filename}"))
             .ok();
-        *scene = Scene {
+        sync_items.scene = Scene {
             range: None,
             meshes: HashMap::new(),
             distant_lights: HashMap::new(),
             sphere_lights: HashMap::new(),
         };
+        sync_items.render_settings = RenderSettings {
+            settings_paths: Vec::new(),
+            product_paths: Vec::new(),
+            current_settings_path: None,
+            next_settings_path: None,
+            current_product_path: None,
+            next_product_path: None,
+        };
     }
 
+    // 裏でusd読み込みのために走っているスレッドでtime_codeが変更された際に呼び出されるメソッド。
+    // UsdDataExtractorからtime_codeに対応するデータを取得し、シーンとしてアクセスできるようにする。
     fn set_time_code(&mut self, time_code: i64) {
         let Some(usd_data_extractor) = &mut self.usd_data_extractor else {
             return;
@@ -163,8 +217,8 @@ impl UsdSceneExtractorTask {
         for data in diff {
             match data {
                 BridgeData::TimeCodeRange(start, end) => {
-                    let mut scene = self.scene.lock().unwrap();
-                    scene.range = Some(TimeCodeRange {
+                    let mut sync_items = self.sync_items.lock().unwrap();
+                    sync_items.scene.range = Some(TimeCodeRange {
                         start: start as i64,
                         end: end as i64,
                     });
@@ -274,16 +328,100 @@ impl UsdSceneExtractorTask {
                 _ => (),
             }
         }
-
-        self.sync_scene();
     }
 
+    // レンダリングに必要なシーン情報のsyncを行う。
     fn sync_scene(&mut self) {
-        let mut scene = self.scene.lock().unwrap();
-        self.sync_light(&mut scene);
-        self.sync_mesh(&mut scene);
+        let sync_items = Arc::clone(&self.sync_items);
+        let mut sync_items = sync_items.lock().unwrap();
+        self.sync_render_settings(&mut sync_items.render_settings);
+        self.sync_light(&mut sync_items.scene);
+        self.sync_mesh(&mut sync_items.scene);
+        self.sync_camera(&mut sync_items.scene);
     }
 
+    // シーン情報をsyncするさいに現在アクティブなRenderSettingsやRenderProductのパスを同期する。
+    // これによって設定されたアクティブなRenderSettingsやRenderProductのパスを、
+    // レンダリングのカメラを決めたりする際に使う。
+    //
+    // 外部からsetやclearされた情報がrender_settingsのnext_XXXで手に入るので、
+    // その値をUsdDataExtractorにsetやclearして
+    // UsdDataExtractorのactiveなRenderSettingsやRenderProductsのパスを同期する。
+    // 同期に成功したら、render_settingsのcurrent_XXXにnext_XXXをコピーして、next_XXXをNoneにする。
+    //
+    // また、それとは別に設定するパスの候補になるRenderSettingsとRenderProductのpathsを取得して
+    // render_settingsに設定する。
+    fn sync_render_settings(&mut self, render_settings: &mut RenderSettings) {
+        // usd_data_extractorがNoneの場合はロード前なので何もしない
+        let Some(usd_data_extractor) = &mut self.usd_data_extractor else {
+            return;
+        };
+
+        // Stage中にある全UsdRenderSettingsのパスを取得
+        render_settings.settings_paths = usd_data_extractor.get_render_settings_paths();
+
+        // render_settingsのnext_settings_pathがSomeの場合は、
+        // そのnext_pathによってUsdDataExtractorのアクティブなRenderSettingsPathをsetしたりClearしたりする。
+        if let Some(next_path) = &render_settings.next_settings_path {
+            match next_path {
+                // next_pathがSomeの場合は、そのパスをアクティブなRenderSettingsのパスとして
+                // UsdDataExtractorにsetする。
+                // setはUsdRenderSettingsとして存在しないパスをセットした場合に失敗する。
+                // 失敗した場合はそのセットは無視する。
+                Some(path) => match usd_data_extractor.set_render_settings_path(path) {
+                    Ok(()) => {
+                        render_settings.current_settings_path = Some(path.to_string());
+                    }
+                    Err(_) => {}
+                },
+                // next_pathがNoneの場合には、アクティブなRenderSettingsPathをClearする。
+                None => {
+                    usd_data_extractor.clear_render_settings_path();
+                    render_settings.current_settings_path = None;
+
+                    // Clearした場合はRenderProductのパスもクリアする。
+                    render_settings.product_paths = Vec::new();
+                    render_settings.current_product_path = None;
+                }
+            }
+            render_settings.next_settings_path = None;
+        }
+
+        // アクティブとしてセットされているUsdRenderSettingsにリレーション登録されている
+        // 全UsdRenderProductのパスを取得する。
+        match usd_data_extractor.get_render_product_paths() {
+            Ok(paths) => render_settings.product_paths = paths,
+            Err(_) => {
+                render_settings.product_paths = Vec::new();
+                render_settings.current_product_path = None;
+            }
+        }
+
+        // render_settingsのnext_product_pathがSomeの場合は、
+        // そのnext_pathによってUsdDataExtractorのアクティブなRenderProductPathをsetしたりClearしたりする。
+        if let Some(next_path) = &render_settings.next_product_path {
+            match next_path {
+                // next_pathがSomeの場合は、そのパスをアクティブなRenderProductのパスとして
+                // UsdDataExtractorにsetする。
+                // setはUsdRenderProductとして存在しないパスをセットした場合に失敗する。
+                // 失敗した場合はそのセットは無視する。
+                Some(path) => match usd_data_extractor.set_render_product_path(path) {
+                    Ok(()) => {
+                        render_settings.current_product_path = Some(path.to_string());
+                    }
+                    Err(_) => {}
+                },
+                // next_pathがNoneの場合には、アクティブなRenderProductPathをClearする。
+                None => {
+                    usd_data_extractor.clear_render_product_path();
+                    render_settings.current_product_path = None;
+                }
+            }
+            render_settings.next_product_path = None;
+        }
+    }
+
+    // シーンのライトの情報を同期する。
     fn sync_light(&self, scene: &mut Scene) {
         // remove deleted lights
         scene
@@ -367,6 +505,10 @@ impl UsdSceneExtractorTask {
         }
     }
 
+    // シーンのメッシュの情報を同期する。
+    // トポロジのInterpolationが頂点属性によって違うので注意。
+    // 今回はInterpolationはVertexとFaceVaryingのみをサポートする。
+    // 各メッシュは三角形化も行う。
     fn sync_mesh(&self, scene: &mut Scene) {
         // remove deleted meshes
         scene
@@ -604,61 +746,124 @@ impl UsdSceneExtractorTask {
             }
         }
     }
+
+    fn sync_camera(&mut self, scene: &mut Scene) {
+        // usd_data_extractorがNoneの場合はロード前なので何もしない
+        let Some(usd_data_extractor) = &mut self.usd_data_extractor else {
+            return;
+        };
+
+        // アクティブなカメラのパスを取得
+        let camera_path = match usd_data_extractor.get_active_camera_path() {
+            Ok(path) => Some(path),
+            Err(_) => None,
+        };
+
+        println!("Active Camera: {:?}", camera_path);
+    }
 }
 
 pub struct SceneLoader {
-    scene: Arc<Mutex<Scene>>,
-    open_usd_sender: Sender<String>,
-    time_code_sender: Sender<i64>,
-    stop_sender: Sender<()>,
+    sync_item: Arc<Mutex<SyncItems>>,
+    message_sender: Sender<UsdSceneExtractorMessage>,
     join_handle: Option<std::thread::JoinHandle<()>>,
 }
 impl SceneLoader {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
-        let scene = Arc::new(Mutex::new(Scene {
+        let scene = Scene {
             range: None,
             meshes: HashMap::new(),
             sphere_lights: HashMap::new(),
             distant_lights: HashMap::new(),
+        };
+        let render_settings = RenderSettings {
+            settings_paths: Vec::new(),
+            product_paths: Vec::new(),
+            current_settings_path: None,
+            next_settings_path: None,
+            current_product_path: None,
+            next_product_path: None,
+        };
+        let sync_item = Arc::new(Mutex::new(SyncItems {
+            scene,
+            render_settings,
         }));
-        let (time_code_sender, time_code_receiver) = channel();
-        let (open_usd_sender, open_usd_receiver) = channel();
-        let (stop_sender, stop_receiver) = channel();
+        let (message_sender, message_receiver) = channel();
 
-        let join_handle = UsdSceneExtractorTask::run(
-            device,
-            queue,
-            Arc::clone(&scene),
-            open_usd_receiver,
-            time_code_receiver,
-            stop_receiver,
-        );
+        let join_handle =
+            UsdSceneExtractorTask::run(device, queue, Arc::clone(&sync_item), message_receiver);
 
         Self {
-            scene,
-            open_usd_sender,
-            time_code_sender,
-            stop_sender,
+            sync_item,
+            message_sender,
             join_handle: Some(join_handle),
         }
     }
 
     pub fn load_usd(&self, filename: &str) {
-        self.open_usd_sender.send(filename.to_string()).unwrap();
+        self.message_sender
+            .send(UsdSceneExtractorMessage::LoadUsd(filename.to_string()))
+            .unwrap();
     }
 
     pub fn set_time_code(&self, time_code: i64) {
-        self.time_code_sender.send(time_code).unwrap();
+        self.message_sender
+            .send(UsdSceneExtractorMessage::SetTimeCode(time_code))
+            .unwrap();
     }
 
     pub fn read_scene(&self, f: impl FnOnce(&Scene)) {
-        let scene = self.scene.lock().unwrap();
-        f(&scene);
+        let sync_item = self.sync_item.lock().unwrap();
+        f(&sync_item.scene);
+    }
+
+    pub fn get_render_settings_paths(&self) -> Vec<String> {
+        let sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.settings_paths.clone()
+    }
+
+    pub fn set_render_settings_path(&self, path: &str) {
+        let mut sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.next_settings_path = Some(Some(path.to_string()));
+        self.message_sender
+            .send(UsdSceneExtractorMessage::SyncRenderSettings)
+            .unwrap();
+    }
+
+    pub fn clear_render_settings_path(&self) {
+        let mut sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.next_settings_path = Some(None);
+        self.message_sender
+            .send(UsdSceneExtractorMessage::SyncRenderSettings)
+            .unwrap();
+    }
+
+    pub fn get_render_product_paths(&self) -> Vec<String> {
+        let sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.product_paths.clone()
+    }
+
+    pub fn set_render_product_path(&self, path: &str) {
+        let mut sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.next_product_path = Some(Some(path.to_string()));
+        self.message_sender
+            .send(UsdSceneExtractorMessage::SyncRenderSettings)
+            .unwrap();
+    }
+
+    pub fn clear_render_product_path(&self) {
+        let mut sync_item = self.sync_item.lock().unwrap();
+        sync_item.render_settings.next_product_path = Some(None);
+        self.message_sender
+            .send(UsdSceneExtractorMessage::SyncRenderSettings)
+            .unwrap();
     }
 }
 impl Drop for SceneLoader {
     fn drop(&mut self) {
-        self.stop_sender.send(()).unwrap();
+        self.message_sender
+            .send(UsdSceneExtractorMessage::Stop)
+            .unwrap();
         let join_handle = self.join_handle.take().unwrap();
         join_handle.join().unwrap();
     }

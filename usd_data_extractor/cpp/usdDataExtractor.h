@@ -13,6 +13,9 @@
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/pxr.h"
+#include "pxr/usd/sdf/path.h"
+#include "pxr/usd/usdRender/product.h"
+#include "pxr/usd/usdRender/settings.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "renderDelegate.h"
 #include "rust/cxx.h"
@@ -27,6 +30,13 @@ public:
   virtual ~BridgeUsdDataExtractor();
 
   void extract(rust::Box<BridgeSendEndNotifier> notifier, double timeCode);
+  rust::Vec<rust::String> get_render_settings_paths();
+  void set_render_settings_path(rust::Str path);
+  void clear_render_settings_path();
+  rust::Vec<rust::String> get_render_product_paths();
+  void set_render_product_path(rust::Str path);
+  void clear_render_product_path();
+  rust::String get_active_camera_path();
 
 private:
   BridgeSenderSharedPtr _sender;
@@ -38,6 +48,8 @@ private:
   UsdImagingDelegate* _delegate;
   HdRenderPassSharedPtr _renderPass;
   TfTokenVector _renderTags;
+  SdfPath _renderSettingsPath;
+  SdfPath _renderProductPath;
 };
 
 std::unique_ptr<BridgeUsdDataExtractor>

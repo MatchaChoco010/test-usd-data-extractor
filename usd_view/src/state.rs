@@ -19,6 +19,8 @@ pub struct State<'a> {
     usd_filename: String,
     usd_time_code: i64,
     usd_time_code_range: std::ops::RangeInclusive<i64>,
+    usd_render_settings_path: Option<String>,
+    usd_render_product_path: Option<String>,
 }
 
 impl<'a> State<'a> {
@@ -100,6 +102,8 @@ impl<'a> State<'a> {
             usd_filename: String::new(),
             usd_time_code: 1,
             usd_time_code_range: 1..=1,
+            usd_render_settings_path: None,
+            usd_render_product_path: None,
         }
     }
 
@@ -148,6 +152,10 @@ impl<'a> State<'a> {
         // egui rendering
         let prev_time_code = self.usd_time_code;
         let mut load_button_clicked = false;
+        let render_settings_paths = self.scene_loader.get_render_settings_paths();
+        let prev_render_settings_path = self.usd_render_settings_path.clone();
+        let render_product_paths = self.scene_loader.get_render_product_paths();
+        let prev_render_product_path = self.usd_render_product_path.clone();
         self.egui_renderer.render(
             window,
             &view,
@@ -156,6 +164,10 @@ impl<'a> State<'a> {
             &mut self.usd_time_code,
             self.usd_time_code_range.clone(),
             &mut load_button_clicked,
+            render_settings_paths,
+            &mut self.usd_render_settings_path,
+            render_product_paths,
+            &mut self.usd_render_product_path,
         );
         if load_button_clicked {
             self.usd_time_code = 1;
@@ -164,6 +176,21 @@ impl<'a> State<'a> {
         }
         if prev_time_code != self.usd_time_code {
             self.scene_loader.set_time_code(self.usd_time_code);
+        }
+        if prev_render_settings_path != self.usd_render_settings_path {
+            if let Some(path) = &self.usd_render_settings_path {
+                self.scene_loader.set_render_settings_path(path);
+            } else {
+                self.scene_loader.clear_render_settings_path();
+                self.usd_render_product_path = None;
+            }
+        }
+        if prev_render_product_path != self.usd_render_product_path {
+            if let Some(path) = &self.usd_render_product_path {
+                self.scene_loader.set_render_product_path(path);
+            } else {
+                self.scene_loader.clear_render_product_path();
+            }
         }
 
         // submit will accept anything that implements IntoIter

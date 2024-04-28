@@ -51,6 +51,10 @@ impl EguiRenderer {
         usd_time_code: &mut i64,
         usd_time_code_range: std::ops::RangeInclusive<i64>,
         load_button_clicked: &mut bool,
+        render_settings_paths: Vec<String>,
+        render_settings_path: &mut Option<String>,
+        render_product_paths: Vec<String>,
+        render_product_path: &mut Option<String>,
     ) {
         let raw_input = self.egui_state.take_egui_input(window);
 
@@ -63,6 +67,32 @@ impl EguiRenderer {
                         *load_button_clicked = true;
                     }
                 });
+                egui::ComboBox::from_label("Render Settings Paths")
+                    .selected_text(
+                        render_settings_path
+                            .clone()
+                            .unwrap_or(String::from("Not selected")),
+                    )
+                    .show_ui(ui, |ui| {
+                        for path in &render_settings_paths {
+                            ui.selectable_value(render_settings_path, Some(path.to_owned()), path);
+                        }
+                        ui.separator();
+                        ui.selectable_value(render_settings_path, None, "Clear Selection");
+                    });
+                egui::ComboBox::from_label("Render Product Paths")
+                    .selected_text(
+                        render_product_path
+                            .clone()
+                            .unwrap_or(String::from("Not selected")),
+                    )
+                    .show_ui(ui, |ui| {
+                        for path in &render_product_paths {
+                            ui.selectable_value(render_product_path, Some(path.to_owned()), path);
+                        }
+                        ui.separator();
+                        ui.selectable_value(render_product_path, None, "Clear Selection");
+                    });
                 ui.scope(|ui| {
                     ui.style_mut().spacing.slider_width = 400.0;
                     ui.horizontal(|ui| {

@@ -144,6 +144,49 @@ impl UsdDataExtractor {
         data
     }
 
+    pub fn get_render_settings_paths(&mut self) -> Vec<String> {
+        let inner = self.inner.pin_mut();
+        inner.get_render_settings_paths()
+    }
+
+    pub fn set_render_settings_path(&mut self, path: &str) -> Result<(), String> {
+        let inner = self.inner.pin_mut();
+        inner
+            .set_render_settings_path(path)
+            .map_err(|e| String::from(e.what()))
+    }
+
+    pub fn clear_render_settings_path(&mut self) {
+        let inner = self.inner.pin_mut();
+        inner.clear_render_settings_path();
+    }
+
+    pub fn get_render_product_paths(&mut self) -> Result<Vec<String>, String> {
+        let inner = self.inner.pin_mut();
+        inner
+            .get_render_product_paths()
+            .map_err(|e| String::from(e.what()))
+    }
+
+    pub fn set_render_product_path(&mut self, path: &str) -> Result<(), String> {
+        let inner = self.inner.pin_mut();
+        inner
+            .set_render_product_path(path)
+            .map_err(|e| String::from(e.what()))
+    }
+
+    pub fn clear_render_product_path(&mut self) {
+        let inner = self.inner.pin_mut();
+        inner.clear_render_product_path();
+    }
+
+    pub fn get_active_camera_path(&mut self) -> Result<String, String> {
+        let inner = self.inner.pin_mut();
+        inner
+            .get_active_camera_path()
+            .map_err(|e| String::from(e.what()))
+    }
+
     pub fn destroy(self) -> Vec<BridgeData> {
         drop(self.inner);
         let mut data = vec![];

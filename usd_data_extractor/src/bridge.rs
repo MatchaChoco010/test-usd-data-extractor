@@ -48,15 +48,28 @@ pub mod ffi {
         include!("usd_data_extractor/cpp/usdDataExtractor.h");
 
         type BridgeUsdDataExtractor;
+        fn new_usd_data_extractor(
+            sender: Box<BridgeSender>,
+            open_path: &str,
+        ) -> Result<UniquePtr<BridgeUsdDataExtractor>>;
         fn extract(
             self: Pin<&mut BridgeUsdDataExtractor>,
             notifier: Box<BridgeSendEndNotifier>,
             time_code: f64,
         );
-        fn new_usd_data_extractor(
-            sender: Box<BridgeSender>,
-            open_path: &str,
-        ) -> Result<UniquePtr<BridgeUsdDataExtractor>>;
+        fn get_render_settings_paths(self: Pin<&mut BridgeUsdDataExtractor>) -> Vec<String>;
+        fn set_render_settings_path(
+            self: Pin<&mut BridgeUsdDataExtractor>,
+            path: &str,
+        ) -> Result<()>;
+        fn clear_render_settings_path(self: Pin<&mut BridgeUsdDataExtractor>);
+        fn get_render_product_paths(self: Pin<&mut BridgeUsdDataExtractor>) -> Result<Vec<String>>;
+        fn set_render_product_path(
+            self: Pin<&mut BridgeUsdDataExtractor>,
+            path: &str,
+        ) -> Result<()>;
+        fn clear_render_product_path(self: Pin<&mut BridgeUsdDataExtractor>);
+        fn get_active_camera_path(self: Pin<&mut BridgeUsdDataExtractor>) -> Result<String>;
     }
 }
 
