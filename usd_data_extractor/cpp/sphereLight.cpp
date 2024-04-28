@@ -74,13 +74,6 @@ HdBridgeSphereLight::_SyncSphereLightData(HdSceneDelegate* sceneDelegate)
     sphereLightData->set_intensity(intensity);
   }
 
-  VtValue radiusValue =
-    sceneDelegate->GetLightParamValue(_id, HdLightTokens->radius);
-  if (radiusValue.IsHolding<float>()) {
-    float radius = radiusValue.Get<float>();
-    sphereLightData->set_radius(radius);
-  }
-
   VtValue angleValue =
     sceneDelegate->GetLightParamValue(_id, HdLightTokens->shapingConeAngle);
   if (angleValue.IsHolding<float>()) {

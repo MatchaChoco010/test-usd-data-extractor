@@ -65,12 +65,14 @@ impl From<Box<bridge::MeshData>> for MeshData {
 pub struct DistantLightData {
     pub intensity: f32,
     pub color: [f32; 3],
+    pub angle: Option<f32>,
 }
 impl From<Box<bridge::DistantLightData>> for DistantLightData {
     fn from(data: Box<bridge::DistantLightData>) -> Self {
         Self {
             intensity: data.intensity,
             color: data.color,
+            angle: data.angle,
         }
     }
 }
@@ -79,7 +81,6 @@ impl From<Box<bridge::DistantLightData>> for DistantLightData {
 pub struct SphereLightData {
     pub intensity: f32,
     pub color: [f32; 3],
-    pub radius: f32,
     pub cone_angle: Option<f32>,
     pub cone_softness: Option<f32>,
 }
@@ -88,7 +89,6 @@ impl From<Box<bridge::SphereLightData>> for SphereLightData {
         Self {
             intensity: data.intensity,
             color: data.color,
-            radius: data.radius,
             cone_angle: data.cone_angle,
             cone_softness: data.cone_softness,
         }

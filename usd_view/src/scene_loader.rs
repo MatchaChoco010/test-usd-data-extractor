@@ -24,9 +24,30 @@ pub struct Mesh {
 }
 
 #[derive(Debug)]
+pub struct DistantLight {
+    pub direction: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub angle: f32,
+}
+
+#[derive(Debug)]
+pub struct SphereLight {
+    pub is_spot: bool,
+    pub position: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub direction: Option<Vec3>,
+    pub cone_angle: Option<f32>,
+    pub cone_softness: Option<f32>,
+}
+
+#[derive(Debug)]
 pub struct Scene {
     pub range: Option<TimeCodeRange>,
     pub meshes: HashMap<String, Mesh>,
+    pub sphere_lights: HashMap<String, SphereLight>,
+    pub distant_lights: HashMap<String, DistantLight>,
 }
 
 #[derive(Debug)]
@@ -52,6 +73,7 @@ struct UsdSceneDistantLight {
     dirty_params: bool,
     intensity: Option<f32>,
     color: Option<[f32; 3]>,
+    angle: Option<f32>,
 }
 
 #[derive(Debug)]
@@ -62,7 +84,6 @@ struct UsdSceneSphereLight {
     is_spot: bool,
     intensity: Option<f32>,
     color: Option<[f32; 3]>,
-    radius: Option<f32>,
     cone_angle: Option<f32>,
     cone_softness: Option<f32>,
 }
@@ -128,6 +149,8 @@ impl UsdSceneExtractorTask {
         *scene = Scene {
             range: None,
             meshes: HashMap::new(),
+            distant_lights: HashMap::new(),
+            sphere_lights: HashMap::new(),
         };
     }
 
@@ -205,6 +228,7 @@ impl UsdSceneExtractorTask {
                             dirty_params: true,
                             intensity: None,
                             color: None,
+                            angle: None,
                         },
                     );
                 }
@@ -213,7 +237,7 @@ impl UsdSceneExtractorTask {
                         light.intensity = Some(data.intensity);
                         light.color = Some(data.color);
                         light.dirty_params = true;
-                        println!("Distant light data: {light:?}");
+                        light.angle = data.angle;
                     }
                 }
                 BridgeData::DestroyDistantLight(path) => {
@@ -229,7 +253,6 @@ impl UsdSceneExtractorTask {
                             is_spot: false,
                             intensity: None,
                             color: None,
-                            radius: None,
                             cone_angle: None,
                             cone_softness: None,
                         },
@@ -239,12 +262,10 @@ impl UsdSceneExtractorTask {
                     if let Some(light) = self.sphere_lights.get_mut(&path.0) {
                         light.intensity = Some(data.intensity);
                         light.color = Some(data.color);
-                        light.radius = Some(data.radius);
                         light.is_spot = data.cone_angle.is_some();
                         light.cone_angle = data.cone_angle;
                         light.cone_softness = data.cone_softness;
                         light.dirty_params = true;
-                        println!("Sphere light data:: {light:?}");
                     }
                 }
                 BridgeData::DestroySphereLight(path) => {
@@ -259,7 +280,91 @@ impl UsdSceneExtractorTask {
 
     fn sync_scene(&mut self) {
         let mut scene = self.scene.lock().unwrap();
+        self.sync_light(&mut scene);
         self.sync_mesh(&mut scene);
+    }
+
+    fn sync_light(&self, scene: &mut Scene) {
+        // remove deleted lights
+        scene
+            .distant_lights
+            .retain(|path, _| self.distant_lights.contains_key(path));
+        scene
+            .sphere_lights
+            .retain(|path, _| self.sphere_lights.contains_key(path));
+
+        // create new lights
+        for (path, _) in &self.distant_lights {
+            if !scene.distant_lights.contains_key(path) {
+                scene.distant_lights.insert(
+                    path.to_owned(),
+                    DistantLight {
+                        direction: Vec3::Z,
+                        intensity: 0.0,
+                        color: Vec3::ZERO,
+                        angle: 0.0,
+                    },
+                );
+            }
+        }
+        for (path, _) in &self.sphere_lights {
+            if !scene.sphere_lights.contains_key(path) {
+                scene.sphere_lights.insert(
+                    path.to_owned(),
+                    SphereLight {
+                        is_spot: false,
+                        position: Vec3::ZERO,
+                        intensity: 0.0,
+                        color: Vec3::ZERO,
+                        direction: None,
+                        cone_angle: None,
+                        cone_softness: None,
+                    },
+                );
+            }
+        }
+
+        // update lights
+        for (path, light) in &self.distant_lights {
+            if light.dirty_transform {
+                let scene_light = scene.distant_lights.get_mut(path).unwrap();
+                let transform = light
+                    .transform_matrix
+                    .map(|m| glam::Mat4::from_cols_array(&m))
+                    .unwrap_or(glam::Mat4::IDENTITY);
+                let direction = transform.transform_vector3(Vec3::Z).normalize();
+                scene_light.direction = direction;
+            }
+
+            if light.dirty_params {
+                let scene_light = scene.distant_lights.get_mut(path).unwrap();
+                scene_light.intensity = light.intensity.unwrap_or(0.0);
+                scene_light.color = light.color.map_or(Vec3::ZERO, |c| Vec3::from_array(c));
+                scene_light.angle = light.angle.unwrap_or(0.0);
+            }
+        }
+        for (path, light) in &self.sphere_lights {
+            if light.dirty_transform {
+                let scene_light = scene.sphere_lights.get_mut(path).unwrap();
+                let transform = light
+                    .transform_matrix
+                    .map(|m| glam::Mat4::from_cols_array(&m))
+                    .unwrap_or(glam::Mat4::IDENTITY);
+                let position = transform.transform_point3(Vec3::ZERO);
+                let direction = transform.transform_vector3(Vec3::Z).normalize();
+                scene_light.position = position;
+                scene_light.direction = Some(direction);
+            }
+
+            if light.dirty_params {
+                let scene_light = scene.sphere_lights.get_mut(path).unwrap();
+                scene_light.intensity = light.intensity.unwrap_or(0.0);
+                scene_light.color = light.color.map_or(Vec3::ZERO, |c| Vec3::from_array(c));
+                scene_light.is_spot = light.is_spot;
+                scene_light.cone_angle = light.cone_angle;
+                scene_light.cone_softness = light.cone_softness;
+            }
+        }
     }
 
     fn sync_mesh(&self, scene: &mut Scene) {
@@ -513,6 +618,8 @@ impl SceneLoader {
         let scene = Arc::new(Mutex::new(Scene {
             range: None,
             meshes: HashMap::new(),
+            sphere_lights: HashMap::new(),
+            distant_lights: HashMap::new(),
         }));
         let (time_code_sender, time_code_receiver) = channel();
         let (open_usd_sender, open_usd_receiver) = channel();

@@ -24,7 +24,6 @@ pub mod ffi {
         fn new_sphere_light_data() -> Box<SphereLightData>;
         fn set_intensity(self: &mut SphereLightData, intensity: f32);
         fn set_color(self: &mut SphereLightData, r: f32, g: f32, b: f32);
-        fn set_radius(self: &mut SphereLightData, radius: f32);
         fn set_cone_angle(self: &mut SphereLightData, angle: f32);
         fn set_cone_softness(self: &mut SphereLightData, softness: f32);
 
@@ -146,7 +145,6 @@ pub fn new_sphere_light_data() -> Box<SphereLightData> {
     Box::new(SphereLightData {
         intensity: 0.0,
         color: [0.0, 0.0, 0.0],
-        radius: 0.0,
         cone_angle: None,
         cone_softness: None,
     })
@@ -155,7 +153,6 @@ pub fn new_sphere_light_data() -> Box<SphereLightData> {
 pub struct SphereLightData {
     pub intensity: f32,
     pub color: [f32; 3],
-    pub radius: f32,
     pub cone_angle: Option<f32>,
     pub cone_softness: Option<f32>,
 }
@@ -166,10 +163,6 @@ impl SphereLightData {
 
     pub fn set_color(&mut self, r: f32, g: f32, b: f32) {
         self.color = [r, g, b];
-    }
-
-    pub fn set_radius(&mut self, radius: f32) {
-        self.radius = radius;
     }
 
     pub fn set_cone_angle(&mut self, angle: f32) {

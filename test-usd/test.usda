@@ -1108,7 +1108,7 @@ def Xform "lights"
         float inputs:diffuse = 1
         bool inputs:enableColorTemperature = 0
         float inputs:exposure = 0
-        float inputs:intensity = 5
+        float inputs:intensity = 2.5
         bool inputs:normalize = 1
         float inputs:specular = 1
         rel light:filters = None
