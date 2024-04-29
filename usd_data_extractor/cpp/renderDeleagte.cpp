@@ -9,8 +9,11 @@ TfTokenVector SUPPORTED_SPRIM_TYPES = {
   HdPrimTypeTokens->material,
   HdPrimTypeTokens->distantLight,
   HdPrimTypeTokens->sphereLight,
+  HdBridgeRenderProductTokens->renderProduct,
 };
-TfTokenVector SUPPORTED_BPRIM_TYPES = {};
+TfTokenVector SUPPORTED_BPRIM_TYPES = {
+  HdPrimTypeTokens->renderSettings,
+};
 
 HdBridgeRenderDelegate::HdBridgeRenderDelegate(BridgeSenderSharedPtr sender)
   : HdRenderDelegate()
@@ -105,6 +108,9 @@ HdBridgeRenderDelegate::CreateSprim(TfToken const& typeId,
   if (typeId == HdPrimTypeTokens->sphereLight) {
     return new HdBridgeSphereLight(sprimId, _sender);
   }
+  if (typeId == HdBridgeRenderProductTokens->renderProduct) {
+    return new HdBridgeRenderProduct(sprimId, _sender);
+  }
 
   TF_CODING_ERROR(
     "Unknown Sprim type=%s id=%s", typeId.GetText(), sprimId.GetText());
@@ -126,6 +132,9 @@ HdBridgeRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
   if (typeId == HdPrimTypeTokens->sphereLight) {
     return new HdBridgeSphereLight(SdfPath::EmptyPath(), _sender);
   }
+  if (typeId == HdBridgeRenderProductTokens->renderProduct) {
+    return new HdBridgeRenderProduct(SdfPath::EmptyPath(), _sender);
+  }
 
   TF_CODING_ERROR("Creating unknown fallback sprim type=%s", typeId.GetText());
   return nullptr;
@@ -141,6 +150,10 @@ HdBprim*
 HdBridgeRenderDelegate::CreateBprim(TfToken const& typeId,
                                     SdfPath const& bprimId)
 {
+  if (typeId == HdPrimTypeTokens->renderSettings) {
+    return new HdBridgeRenderSettings(bprimId, _sender);
+  }
+
   TF_CODING_ERROR(
     "Unknown Bprim type=%s id=%s", typeId.GetText(), bprimId.GetText());
   return nullptr;
@@ -149,6 +162,10 @@ HdBridgeRenderDelegate::CreateBprim(TfToken const& typeId,
 HdBprim*
 HdBridgeRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
 {
+  if (typeId == HdPrimTypeTokens->renderSettings) {
+    return new HdBridgeRenderSettings(SdfPath::EmptyPath(), _sender);
+  }
+
   TF_CODING_ERROR("Creating unknown fallback bprim type=%s", typeId.GetText());
   return nullptr;
 }

@@ -3,7 +3,7 @@ use glam::{Vec2, Vec3};
 use std::sync::Arc;
 use wgpu::{CommandEncoder, TextureView};
 
-use crate::scene_loader::Scene;
+use crate::scene::Scene;
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]

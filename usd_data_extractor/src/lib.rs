@@ -110,6 +110,30 @@ impl From<Box<bridge::CameraData>> for CameraData {
 }
 
 #[derive(Debug, Clone)]
+pub struct RenderSettingsData {
+    pub render_product_paths: Vec<String>,
+}
+impl From<Box<bridge::RenderSettingsData>> for RenderSettingsData {
+    fn from(data: Box<bridge::RenderSettingsData>) -> Self {
+        Self {
+            render_product_paths: data.render_product_paths,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderProductData {
+    pub camera_path: String,
+}
+impl From<Box<bridge::RenderProductData>> for RenderProductData {
+    fn from(data: Box<bridge::RenderProductData>) -> Self {
+        Self {
+            camera_path: data.camera_path,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UsdSdfPath(pub String);
 impl Display for UsdSdfPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -133,6 +157,12 @@ pub enum BridgeData {
     CreateCamera(UsdSdfPath),
     CameraData(UsdSdfPath, CameraData),
     DestroyCamera(UsdSdfPath),
+    CreateRenderSettings(UsdSdfPath),
+    RenderSettingsData(UsdSdfPath, RenderSettingsData),
+    DestroyRenderSettings(UsdSdfPath),
+    CreateRenderProduct(UsdSdfPath),
+    RenderProductData(UsdSdfPath, RenderProductData),
+    DestroyRenderProduct(UsdSdfPath),
 }
 
 pub struct UsdDataExtractor {

@@ -14,7 +14,10 @@
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/sprim.h"
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/pxr.h"
+#include "renderProduct.h"
+#include "renderSettings.h"
 #include "rust/cxx.h"
 #include "sphereLight.h"
 #include <iostream>

@@ -14,5 +14,7 @@ struct BridgeSendEndNotifier;
 struct MeshData;
 struct DistantLightData;
 struct SphereLightData;
+struct RenderSettingsData;
+struct RenderProductData;
 
 #endif

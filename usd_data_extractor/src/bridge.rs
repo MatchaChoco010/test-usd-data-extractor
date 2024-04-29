@@ -32,6 +32,14 @@ pub mod ffi {
         fn set_focal_length(self: &mut CameraData, focal_length: f32);
         fn set_vertical_aperture(self: &mut CameraData, vertical_aperture: f32);
 
+        type RenderSettingsData;
+        fn new_render_settings_data() -> Box<RenderSettingsData>;
+        fn set_render_product_paths(self: &mut RenderSettingsData, paths: &[String]);
+
+        type RenderProductData;
+        fn new_render_product_data() -> Box<RenderProductData>;
+        fn set_camera_path(self: &mut RenderProductData, path: String);
+
         type BridgeSender;
         fn message(self: &BridgeSender, s: String);
         fn time_code_range(self: &BridgeSender, start: f64, end: f64);
@@ -48,6 +56,12 @@ pub mod ffi {
         fn create_camera(self: &BridgeSender, path: String);
         fn camera_data(self: &BridgeSender, path: String, data: Box<CameraData>);
         fn destroy_camera(self: &BridgeSender, path: String);
+        fn create_render_settings(self: &BridgeSender, path: String);
+        fn render_settings_data(self: &BridgeSender, path: String, data: Box<RenderSettingsData>);
+        fn destroy_render_settings(self: &BridgeSender, path: String);
+        fn create_render_product(self: &BridgeSender, path: String);
+        fn render_product_data(self: &BridgeSender, path: String, data: Box<RenderProductData>);
+        fn destroy_render_product(self: &BridgeSender, path: String);
 
         type BridgeSendEndNotifier;
         fn notify(self: &mut BridgeSendEndNotifier);
@@ -216,6 +230,36 @@ impl CameraData {
     }
 }
 
+pub fn new_render_settings_data() -> Box<RenderSettingsData> {
+    Box::new(RenderSettingsData {
+        render_product_paths: Vec::new(),
+    })
+}
+
+pub struct RenderSettingsData {
+    pub render_product_paths: Vec<String>,
+}
+impl RenderSettingsData {
+    pub fn set_render_product_paths(&mut self, paths: &[String]) {
+        self.render_product_paths = paths.to_vec();
+    }
+}
+
+pub fn new_render_product_data() -> Box<RenderProductData> {
+    Box::new(RenderProductData {
+        camera_path: String::new(),
+    })
+}
+
+pub struct RenderProductData {
+    pub camera_path: String,
+}
+impl RenderProductData {
+    pub fn set_camera_path(&mut self, path: String) {
+        self.camera_path = path;
+    }
+}
+
 pub struct BridgeSender {
     sender: Sender<BridgeData>,
 }
@@ -300,6 +344,36 @@ impl BridgeSender {
 
     pub fn destroy_camera(&self, path: String) {
         let data = BridgeData::DestroyCamera(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_render_settings(&self, path: String) {
+        let data = BridgeData::CreateRenderSettings(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn render_settings_data(&self, path: String, data: Box<RenderSettingsData>) {
+        let data = BridgeData::RenderSettingsData(UsdSdfPath(path), data.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_render_settings(&self, path: String) {
+        let data = BridgeData::DestroyRenderSettings(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn create_render_product(&self, path: String) {
+        let data = BridgeData::CreateRenderProduct(UsdSdfPath(path));
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn render_product_data(&self, path: String, data: Box<RenderProductData>) {
+        let data = BridgeData::RenderProductData(UsdSdfPath(path), data.into());
+        self.sender.send(data).unwrap();
+    }
+
+    pub fn destroy_render_product(&self, path: String) {
+        let data = BridgeData::DestroyRenderProduct(UsdSdfPath(path));
         self.sender.send(data).unwrap();
     }
 }
