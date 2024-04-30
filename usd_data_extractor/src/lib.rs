@@ -278,20 +278,15 @@ impl MeshData {
                 let face_vertex_count = *face_vertex_count as usize;
                 if indices.contains(&(i as u32)) {
                     for i in 2..face_vertex_count {
-                        // vertex_triangulate_indices.push(face_vertex_indices[index_offset] as usize);
-                        // vertex_triangulate_indices
-                        //     .push(face_vertex_indices[index_offset + i - 1] as usize);
-                        // vertex_triangulate_indices
-                        //     .push(face_vertex_indices[index_offset + i] as usize);
-                        // face_varying_triangulate_indices.push(index_offset);
-                        // face_varying_triangulate_indices.push(index_offset + i - 1);
-                        // face_varying_triangulate_indices.push(index_offset + i);
-                        // sub_mesh_indices.push(face_vertex_indices[index_offset] as u32);
-                        // sub_mesh_indices.push(face_vertex_indices[index_offset + i - 1] as u32);
-                        // sub_mesh_indices.push(face_vertex_indices[index_offset + i] as u32);
-                        sub_mesh_indices.push(index_offset as u32);
-                        sub_mesh_indices.push((index_offset + i - 1) as u32);
-                        sub_mesh_indices.push((index_offset + i) as u32);
+                        if left_handed {
+                            sub_mesh_indices.push((index_offset + i) as u32);
+                            sub_mesh_indices.push((index_offset + i - 1) as u32);
+                            sub_mesh_indices.push(index_offset as u32);
+                        } else {
+                            sub_mesh_indices.push(index_offset as u32);
+                            sub_mesh_indices.push((index_offset + i - 1) as u32);
+                            sub_mesh_indices.push((index_offset + i) as u32);
+                        }
                     }
                     used_face_indices.push(i as u64);
                 }
@@ -315,17 +310,15 @@ impl MeshData {
             let face_vertex_count = *face_vertex_count as usize;
             if base_indices.contains(&(i as u64)) {
                 for i in 2..face_vertex_count {
-                    // vertex_triangulate_indices.push(face_vertex_indices[index_offset] as usize);
-                    // vertex_triangulate_indices
-                    //     .push(face_vertex_indices[index_offset + i - 1] as usize);
-                    // vertex_triangulate_indices
-                    //     .push(face_vertex_indices[index_offset + i] as usize);
-                    // face_varying_triangulate_indices.push(index_offset);
-                    // face_varying_triangulate_indices.push(index_offset + i - 1);
-                    // face_varying_triangulate_indices.push(index_offset + i);
-                    sub_mesh_indices.push(index_offset as u32);
-                    sub_mesh_indices.push((index_offset + i - 1) as u32);
-                    sub_mesh_indices.push((index_offset + i) as u32);
+                    if left_handed {
+                        sub_mesh_indices.push((index_offset + i) as u32);
+                        sub_mesh_indices.push((index_offset + i - 1) as u32);
+                        sub_mesh_indices.push(index_offset as u32);
+                    } else {
+                        sub_mesh_indices.push(index_offset as u32);
+                        sub_mesh_indices.push((index_offset + i - 1) as u32);
+                        sub_mesh_indices.push((index_offset + i) as u32);
+                    }
                 }
                 used_face_indices.push(i as u64);
             }
