@@ -1,9 +1,8 @@
-use bytemuck::Zeroable;
-use glam::{Vec2, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use std::sync::Arc;
 use wgpu::{CommandEncoder, TextureView};
 
-use crate::scene::Scene;
+use crate::render_scene::RenderScene;
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
@@ -165,8 +164,8 @@ pub struct Renderer {
     point_lights_buffer: wgpu::Buffer,
     spot_lights_buffer: wgpu::Buffer,
     lights_bind_group: wgpu::BindGroup,
-    model_bind_group_layout: wgpu::BindGroupLayout,
-    model_bind_groups: Vec<wgpu::BindGroup>,
+    transform_matrix_bind_group_layout: wgpu::BindGroupLayout,
+    transform_matrix_bind_groups: Vec<wgpu::BindGroup>,
     depth_texture: Texture,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -283,7 +282,7 @@ impl Renderer {
             label: Some("lights_bind_group"),
         });
 
-        let model_bind_group_layout =
+        let transform_matrix_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -306,7 +305,7 @@ impl Renderer {
                 bind_group_layouts: &[
                     &camera_bind_group_layout,
                     &lights_bind_group_layout,
-                    &model_bind_group_layout,
+                    &transform_matrix_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -360,8 +359,8 @@ impl Renderer {
             point_lights_buffer,
             spot_lights_buffer,
             lights_bind_group,
-            model_bind_group_layout,
-            model_bind_groups: vec![],
+            transform_matrix_bind_group_layout,
+            transform_matrix_bind_groups: vec![],
             depth_texture,
             render_pipeline,
         }
@@ -376,7 +375,7 @@ impl Renderer {
         view: &TextureView,
         encoder: &mut CommandEncoder,
         size: winit::dpi::PhysicalSize<u32>,
-        scene: &Scene,
+        scene: &RenderScene,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
@@ -406,10 +405,19 @@ impl Renderer {
         });
 
         {
+            // let camera = Camera {
+            //     view: scene.camera.view_matrix,
+            //     projection: glam::Mat4::perspective_rh(
+            //         scene.camera.fovy,
+            //         size.width as f32 / size.height as f32,
+            //         0.01,
+            //         100.0,
+            //     ),
+            // };
             let camera = Camera {
-                view: scene.camera.view_matrix,
-                projection: glam::Mat4::perspective_rh(
-                    scene.camera.fovy,
+                view: Mat4::look_at_rh(Vec3::new(0.0, 1.2, 5.0), Vec3::new(0.0, 1.0, 0.0), Vec3::Y),
+                projection: Mat4::perspective_rh(
+                    60.0_f32.to_radians(),
                     size.width as f32 / size.height as f32,
                     0.01,
                     100.0,
@@ -421,118 +429,121 @@ impl Renderer {
 
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-        {
-            let mut directional_lights = Vec::with_capacity(4);
-            for light in scene.distant_lights.values() {
-                directional_lights.push(DirectionalLight {
-                    direction: light.direction,
-                    intensity: light.intensity,
-                    color: light.color,
-                    angle: light.angle,
-                });
-            }
-            let mut lights = [Zeroable::zeroed(); 4];
-            for i in 0..4 {
-                lights[i] = directional_lights
-                    .get(i)
-                    .cloned()
-                    .unwrap_or(Zeroable::zeroed());
-            }
-            let directional_lights = DirectionalLights {
-                lights,
-                count: directional_lights.len().max(4) as u32,
-                _padding: [0; 3],
-            };
-            self.queue.write_buffer(
-                &self.directional_lights_buffer,
-                0,
-                bytemuck::cast_slice(&[directional_lights]),
-            );
-        }
+        // {
+        //     let mut directional_lights = Vec::with_capacity(4);
+        //     for light in scene.distant_lights.values() {
+        //         directional_lights.push(DirectionalLight {
+        //             direction: light.direction,
+        //             intensity: light.intensity,
+        //             color: light.color,
+        //             angle: light.angle,
+        //         });
+        //     }
+        //     let mut lights = [Zeroable::zeroed(); 4];
+        //     for i in 0..4 {
+        //         lights[i] = directional_lights
+        //             .get(i)
+        //             .cloned()
+        //             .unwrap_or(Zeroable::zeroed());
+        //     }
+        //     let directional_lights = DirectionalLights {
+        //         lights,
+        //         count: directional_lights.len().max(4) as u32,
+        //         _padding: [0; 3],
+        //     };
+        //     self.queue.write_buffer(
+        //         &self.directional_lights_buffer,
+        //         0,
+        //         bytemuck::cast_slice(&[directional_lights]),
+        //     );
+        // }
 
-        {
-            let mut point_lights = Vec::with_capacity(16);
-            let mut spot_lights = Vec::with_capacity(16);
-            for light in scene.sphere_lights.values() {
-                if light.is_spot {
-                    spot_lights.push(SpotLight {
-                        position: light.position,
-                        intensity: light.intensity,
-                        direction: light.direction.unwrap(),
-                        color: light.color,
-                        angle: light.cone_angle.unwrap().to_radians(),
-                        softness: light.cone_softness.unwrap(),
-                    });
-                } else {
-                    point_lights.push(PointLight {
-                        position: light.position,
-                        intensity: light.intensity,
-                        color: light.color,
-                        _padding: 0,
-                    });
-                }
-            }
-            {
-                let mut lights = [Zeroable::zeroed(); 16];
-                for i in 0..16 {
-                    lights[i] = point_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
-                }
-                let point_lights = PointLights {
-                    lights,
-                    count: point_lights.len().max(16) as u32,
-                    _padding: [0; 3],
-                };
-                self.queue.write_buffer(
-                    &self.point_lights_buffer,
-                    0,
-                    bytemuck::cast_slice(&[point_lights]),
-                );
-            }
-            {
-                let mut lights = [Zeroable::zeroed(); 16];
-                for i in 0..16 {
-                    lights[i] = spot_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
-                }
-                let spot_lights = SpotLights {
-                    lights,
-                    count: spot_lights.len().max(16) as u32,
-                    _padding: [0; 3],
-                };
-                self.queue.write_buffer(
-                    &self.spot_lights_buffer,
-                    0,
-                    bytemuck::cast_slice(&[spot_lights]),
-                );
-            }
-        }
+        // {
+        //     let mut point_lights = Vec::with_capacity(16);
+        //     let mut spot_lights = Vec::with_capacity(16);
+        //     for light in scene.sphere_lights.values() {
+        //         if light.is_spot {
+        //             spot_lights.push(SpotLight {
+        //                 position: light.position,
+        //                 intensity: light.intensity,
+        //                 direction: light.direction.unwrap(),
+        //                 color: light.color,
+        //                 angle: light.cone_angle.unwrap().to_radians(),
+        //                 softness: light.cone_softness.unwrap(),
+        //             });
+        //         } else {
+        //             point_lights.push(PointLight {
+        //                 position: light.position,
+        //                 intensity: light.intensity,
+        //                 color: light.color,
+        //                 _padding: 0,
+        //             });
+        //         }
+        //     }
+        //     {
+        //         let mut lights = [Zeroable::zeroed(); 16];
+        //         for i in 0..16 {
+        //             lights[i] = point_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
+        //         }
+        //         let point_lights = PointLights {
+        //             lights,
+        //             count: point_lights.len().max(16) as u32,
+        //             _padding: [0; 3],
+        //         };
+        //         self.queue.write_buffer(
+        //             &self.point_lights_buffer,
+        //             0,
+        //             bytemuck::cast_slice(&[point_lights]),
+        //         );
+        //     }
+        //     {
+        //         let mut lights = [Zeroable::zeroed(); 16];
+        //         for i in 0..16 {
+        //             lights[i] = spot_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
+        //         }
+        //         let spot_lights = SpotLights {
+        //             lights,
+        //             count: spot_lights.len().max(16) as u32,
+        //             _padding: [0; 3],
+        //         };
+        //         self.queue.write_buffer(
+        //             &self.spot_lights_buffer,
+        //             0,
+        //             bytemuck::cast_slice(&[spot_lights]),
+        //         );
+        //     }
+        // }
 
         render_pass.set_bind_group(1, &self.lights_bind_group, &[]);
 
-        self.model_bind_groups.clear();
-        for (_, mesh) in &scene.meshes {
-            let model_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.model_bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &mesh.model_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                }],
-                label: Some("model_bind_group"),
-            });
-            self.model_bind_groups.push(model_bind_group);
+        let meshes = scene.get_render_meshes();
+
+        self.transform_matrix_bind_groups.clear();
+        for mesh in &meshes {
+            let transform_matrix_bind_group =
+                self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &self.transform_matrix_bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: mesh.transform_matrix_buffer,
+                            offset: 0,
+                            size: None,
+                        }),
+                    }],
+                    label: Some("transform_matrix_bind_group"),
+                });
+            self.transform_matrix_bind_groups
+                .push(transform_matrix_bind_group);
         }
 
         render_pass.set_pipeline(&self.render_pipeline);
 
-        for (i, mesh) in scene.meshes.values().enumerate() {
-            render_pass.set_bind_group(2, &self.model_bind_groups[i], &[]);
-            if let Some(vertex_buffer) = mesh.vertex_buffer.as_ref() {
-                render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                render_pass.draw(0..mesh.vertex_count, 0..1);
-            }
+        for (i, mesh) in meshes.into_iter().enumerate() {
+            render_pass.set_bind_group(2, &self.transform_matrix_bind_groups[i], &[]);
+            render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..mesh.index_count, 0, 0..1);
         }
     }
 }

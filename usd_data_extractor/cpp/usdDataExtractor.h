@@ -1,58 +1,45 @@
 #ifndef BRIDGE_USD_DATA_EXTRACTOR_H
 #define BRIDGE_USD_DATA_EXTRACTOR_H
 
-#include <iostream>
-#include <memory>
-
-#include "bridgeSender.h"
-#include "pxr/imaging/hd/changeTracker.h"
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/renderIndex.h"
-#include "pxr/imaging/hd/renderPass.h"
-#include "pxr/imaging/hd/rprim.h"
-#include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
-#include "pxr/usd/usdRender/product.h"
-#include "pxr/usd/usdRender/settings.h"
-#include "pxr/usdImaging/usdImaging/delegate.h"
-#include "renderDelegate.h"
+#include "pxr/usd/usd/stage.h"
+#include "pxr/usdImaging/usdImaging/sceneIndices.h"
+#include "pxr/usdImaging/usdImaging/stageSceneIndex.h"
 #include "rust/cxx.h"
-#include "syncTask.h"
+#include "sceneIndexObserver.h"
+#include "usdDataDiff.h"
+#include <iostream>
+#include <memory>
 
 using namespace pxr;
 
 class BridgeUsdDataExtractor
 {
 public:
-  BridgeUsdDataExtractor(rust::Box<BridgeSender> sender, std::string openPath);
+  BridgeUsdDataExtractor(std::string openPath);
   virtual ~BridgeUsdDataExtractor();
 
-  void extract(rust::Box<BridgeSendEndNotifier> notifier, double timeCode);
-  rust::Vec<rust::String> get_render_settings_paths() const;
-  void set_render_settings_path(rust::Str path);
-  void clear_render_settings_path();
-  rust::Vec<rust::String> get_render_product_paths() const;
-  void set_render_product_path(rust::Str path);
-  void clear_render_product_path();
-  rust::String get_active_camera_path() const;
+  double start_time_code() const { return _startTimeCode; }
+  double end_time_code() const { return _endTimeCode; }
+
+  void extract(double timeCode, UsdDataDiff& diff);
 
 private:
-  BridgeSenderSharedPtr _sender;
   std::string _openPath;
-  HdEngine _engine;
   UsdStageRefPtr _stage;
-  HdBridgeRenderDelegate _renderDelegate;
-  HdRenderIndex* _renderIndex;
-  UsdImagingDelegate* _delegate;
-  HdRenderPassSharedPtr _renderPass;
-  TfTokenVector _renderTags;
-  SdfPath _renderSettingsPath;
-  SdfPath _renderProductPath;
+  double _startTimeCode;
+  double _endTimeCode;
+
+  bool _isFirstExtract = true;
+
+  HdBridgeSceneIndexObserver _observer;
+  UsdImagingStageSceneIndexRefPtr _stageSceneIndex;
+  HdSceneIndexBaseRefPtr _sceneIndex;
 };
 
 std::unique_ptr<BridgeUsdDataExtractor>
-new_usd_data_extractor(rust::Box<BridgeSender> sender, rust::Str openPath);
+new_usd_data_extractor(rust::Str openPath);
 
 #endif

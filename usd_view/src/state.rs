@@ -18,7 +18,6 @@ pub struct State<'a> {
 
     usd_filename: String,
     usd_time_code: i64,
-    usd_time_code_range: std::ops::RangeInclusive<i64>,
 }
 
 impl<'a> State<'a> {
@@ -99,7 +98,6 @@ impl<'a> State<'a> {
 
             usd_filename: String::new(),
             usd_time_code: 1,
-            usd_time_code_range: 1..=1,
         }
     }
 
@@ -140,12 +138,11 @@ impl<'a> State<'a> {
         let size = window.inner_size();
         self.scene_loader.read_scene(|scene| {
             self.renderer.render(&view, &mut encoder, size, scene);
-            if let Some(range) = &scene.range {
-                self.usd_time_code_range = range.start..=range.end;
-            }
         });
 
         // egui rendering
+        let time_code_range = self.scene_loader.get_time_code_range();
+        let time_code_range = (time_code_range.0)..=(time_code_range.1);
         let prev_time_code = self.usd_time_code;
         let mut load_button_clicked = false;
         let render_settings_paths = self.scene_loader.get_render_settings_paths();
@@ -160,7 +157,7 @@ impl<'a> State<'a> {
             &mut encoder,
             &mut self.usd_filename,
             &mut self.usd_time_code,
-            self.usd_time_code_range.clone(),
+            time_code_range,
             &mut load_button_clicked,
             render_settings_paths,
             &mut active_render_settings_path,

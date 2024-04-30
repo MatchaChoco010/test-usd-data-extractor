@@ -1,242 +1,447 @@
-use std::fmt::Display;
+use glam::{Mat4, Vec2, Vec3};
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::mpsc::Receiver;
 
 mod bridge;
 
-#[derive(Debug, Clone)]
-pub enum Interpolation {
-    Constant,
-    Uniform,
-    Varying,
-    Vertex,
-    FaceVarying,
-    Instance,
-}
-impl From<u8> for Interpolation {
-    fn from(i: u8) -> Self {
-        match i {
-            0 => Interpolation::Constant,
-            1 => Interpolation::Uniform,
-            2 => Interpolation::Varying,
-            3 => Interpolation::Vertex,
-            4 => Interpolation::FaceVarying,
-            5 => Interpolation::Instance,
-            _ => panic!("Invalid interpolation value: {}", i),
-        }
-    }
+pub use bridge::{Interpolation, SdfPath};
+
+// #[derive(Debug, Clone)]
+// pub enum Interpolation {
+//     Constant,
+//     Uniform,
+//     Varying,
+//     Vertex,
+//     FaceVarying,
+//     Instance,
+// }
+// impl From<u8> for Interpolation {
+//     fn from(i: u8) -> Self {
+//         match i {
+//             0 => Interpolation::Constant,
+//             1 => Interpolation::Uniform,
+//             2 => Interpolation::Varying,
+//             3 => Interpolation::Vertex,
+//             4 => Interpolation::FaceVarying,
+//             5 => Interpolation::Instance,
+//             _ => panic!("Invalid interpolation value: {}", i),
+//         }
+//     }
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct MeshData {
+//     pub left_handed: bool,
+//     pub points_data: Vec<f32>,
+//     pub points_interpolation: Interpolation,
+//     pub normals_data: Option<Vec<f32>>,
+//     pub normals_interpolation: Option<Interpolation>,
+//     pub uvs_data: Option<Vec<f32>>,
+//     pub uvs_interpolation: Option<Interpolation>,
+//     pub face_vertex_indices: Vec<u64>,
+//     pub face_vertex_counts: Vec<u32>,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct DistantLightData {
+//     pub intensity: f32,
+//     pub color: [f32; 3],
+//     pub angle: Option<f32>,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct SphereLightData {
+//     pub intensity: f32,
+//     pub color: [f32; 3],
+//     pub cone_angle: Option<f32>,
+//     pub cone_softness: Option<f32>,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct CameraData {
+//     pub focal_length: f32,
+//     pub vertical_aperture: f32,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct RenderSettingsData {
+//     pub render_product_paths: Vec<String>,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct RenderProductData {
+//     pub camera_path: String,
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct UsdSdfPath(pub String);
+// impl Display for UsdSdfPath {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", self.0)
+//     }
+// }
+
+// pub enum BridgeData {
+//     Message(String),
+//     TimeCodeRange(f64, f64),
+//     TransformMatrix(UsdSdfPath, [f32; 16]),
+//     CreateMesh(UsdSdfPath),
+//     MeshData(UsdSdfPath, MeshData),
+//     DestroyMesh(UsdSdfPath),
+//     CreateDistantLight(UsdSdfPath),
+//     DistantLightData(UsdSdfPath, DistantLightData),
+//     DestroyDistantLight(UsdSdfPath),
+//     CreateSphereLight(UsdSdfPath),
+//     SphereLightData(UsdSdfPath, SphereLightData),
+//     DestroySphereLight(UsdSdfPath),
+//     CreateCamera(UsdSdfPath),
+//     CameraData(UsdSdfPath, CameraData),
+//     DestroyCamera(UsdSdfPath),
+//     CreateRenderSettings(UsdSdfPath),
+//     RenderSettingsData(UsdSdfPath, RenderSettingsData),
+//     DestroyRenderSettings(UsdSdfPath),
+//     CreateRenderProduct(UsdSdfPath),
+//     RenderProductData(UsdSdfPath, RenderProductData),
+//     DestroyRenderProduct(UsdSdfPath),
+// }
+
+/// USDから抽出したシーンのtransform matrixの情報
+#[derive(Debug)]
+pub struct TransformMatrix {
+    pub matrix: Mat4,
 }
 
-#[derive(Debug, Clone)]
+/// 頂点バッファの一つの頂点情報
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct Vertex {
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub uv: Vec2,
+}
+
+// sub meshのindex情報
+#[derive(Debug)]
+pub struct SubMesh {
+    /// sub meshのindices
+    pub indices: Vec<u32>,
+}
+
+/// USDから抽出した頂点属性などをduplicateしtriangulateし、sub meshに分割したデータ。
+/// 頂点バッファのデータと、sub meshのindex情報を持つ。
+#[derive(Debug)]
 pub struct MeshData {
-    pub left_handed: bool,
-    pub points_data: Vec<f32>,
-    pub points_interpolation: Interpolation,
-    pub normals_data: Option<Vec<f32>>,
-    pub normals_interpolation: Option<Interpolation>,
-    pub uvs_data: Option<Vec<f32>>,
-    pub uvs_interpolation: Option<Interpolation>,
-    pub face_vertex_indices: Vec<u64>,
-    pub face_vertex_counts: Vec<u32>,
+    /// 頂点バッファのデータ
+    pub vertices: Vec<Vertex>,
+    /// sub meshのindex情報
+    pub sub_meshes: Vec<SubMesh>,
 }
-impl From<Box<bridge::MeshData>> for MeshData {
-    fn from(data: Box<bridge::MeshData>) -> Self {
+impl MeshData {
+    fn new(
+        left_handed: bool,
+        points: Vec<f32>,
+        normals: Option<Vec<f32>>,
+        normals_interpolation: Option<Interpolation>,
+        uvs: Option<Vec<f32>>,
+        uvs_interpolation: Option<Interpolation>,
+        face_vertex_indices: Vec<u32>,
+        face_vertex_counts: Vec<u32>,
+        geom_subsets: HashMap<String, (String, Vec<u32>)>,
+    ) -> Self {
+        // InterpolationがVertexの頂点データをduplicatedするindexを計算する
+        let duplicate_vertex_indices = {
+            let mut vertex_indices = Vec::new();
+            for i in 0..face_vertex_indices.len() {
+                vertex_indices.push(face_vertex_indices[i] as usize);
+            }
+            vertex_indices
+        };
+
+        // duplicatedした頂点座標のデータを作成する
+        // Pointsは常にInterpolationはVertex
+        let vertex_points = {
+            let points = bytemuck::cast_slice::<f32, Vec3>(&points);
+            let mut data = Vec::with_capacity(duplicate_vertex_indices.len());
+            for &index in &duplicate_vertex_indices {
+                data.push(points[index]);
+            }
+            data
+        };
+
+        // duplicatedした法線ベクトルのデータを作成する
+        let vertex_normals = {
+            let vertex_normals = if let (Some(normals), Some(normals_interpolation)) =
+                (normals, normals_interpolation)
+            {
+                // データが渡された場合、そのデータのInterpolationに合わせてduplicatedする
+                // 現状はFaceVaryingとVertexのInterpolationのみ対応
+                match normals_interpolation {
+                    Interpolation::FaceVarying => {
+                        let normals = bytemuck::cast_slice::<f32, Vec3>(&normals);
+                        Some(normals.to_vec())
+                    }
+                    Interpolation::Vertex => {
+                        let normals = bytemuck::cast_slice::<f32, Vec3>(&normals);
+                        let mut data = Vec::with_capacity(duplicate_vertex_indices.len());
+                        for &index in &duplicate_vertex_indices {
+                            data.push(normals[index]);
+                        }
+                        Some(data)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Some(vertex_normals) = vertex_normals {
+                vertex_normals
+            } else {
+                // Interpolationが対応していない場合や、頂点法線データが渡されていない場合、頂点データから計算する
+                let points = bytemuck::cast_slice::<f32, Vec3>(&points);
+                let mut normals_point = vec![Vec3::ZERO; points.len()];
+                let indices = &duplicate_vertex_indices;
+                let mut index_offset = 0;
+                for face_vertex_count in &face_vertex_counts {
+                    let face_vertex_count = *face_vertex_count as usize;
+                    for i in 2..face_vertex_count {
+                        let p0 = points[indices[index_offset]];
+                        let p1 = points[indices[index_offset + i - 1]];
+                        let p2 = points[indices[index_offset + i]];
+                        let mut normal = (p1 - p0).cross(p2 - p0).normalize();
+                        if left_handed {
+                            normal = -normal;
+                        }
+                        for &index in &indices[index_offset..index_offset + face_vertex_count] {
+                            normals_point[index] += normal;
+                        }
+                    }
+                    index_offset += face_vertex_count;
+                }
+                let mut mean_normals = Vec::with_capacity(points.len());
+                for normals in normals_point {
+                    mean_normals.push(normals.normalize());
+                }
+                let mut vertex_normals = Vec::with_capacity(indices.len());
+                for &index in indices {
+                    vertex_normals.push(mean_normals[index]);
+                }
+                vertex_normals
+            }
+        };
+
+        // duplicatedしたUV座標のデータを作成する
+        let vertex_uvs = {
+            if let (Some(uvs), Some(uvs_interpolation)) = (uvs, uvs_interpolation) {
+                match uvs_interpolation {
+                    Interpolation::FaceVarying => {
+                        let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
+                        Some(uvs.to_vec())
+                    }
+                    Interpolation::Vertex => {
+                        let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
+                        let mut data = Vec::with_capacity(duplicate_vertex_indices.len());
+                        for &index in &duplicate_vertex_indices {
+                            data.push(uvs[index]);
+                        }
+                        Some(data)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        };
+
+        // vertex bufferの情報を作る
+        let mut vertices = Vec::with_capacity(vertex_points.len());
+        for i in 0..vertex_points.len() {
+            vertices.push(Vertex {
+                position: vertex_points[i],
+                normal: vertex_normals[i],
+                uv: vertex_uvs.as_ref().map_or(Vec2::ZERO, |uvs| uvs[i]),
+            });
+        }
+
+        // sub meshのindex情報を作る
+        let mut used_face_indices = Vec::new();
+        let mut sub_meshes = Vec::new();
+        for (_sub_mesh_name, (ty_, indices)) in geom_subsets {
+            // typeFaceSet以外のいgeomSubsetsには未対応
+            if ty_ != "typeFaceSet" {
+                continue;
+            }
+
+            // geomSubsetに含まれるfaceをtriangulateしたindexを作る
+            let mut sub_mesh_indices = Vec::new();
+            let mut index_offset = 0;
+            for (i, face_vertex_count) in face_vertex_counts.iter().enumerate() {
+                let face_vertex_count = *face_vertex_count as usize;
+                if indices.contains(&(i as u32)) {
+                    for i in 2..face_vertex_count {
+                        // vertex_triangulate_indices.push(face_vertex_indices[index_offset] as usize);
+                        // vertex_triangulate_indices
+                        //     .push(face_vertex_indices[index_offset + i - 1] as usize);
+                        // vertex_triangulate_indices
+                        //     .push(face_vertex_indices[index_offset + i] as usize);
+                        // face_varying_triangulate_indices.push(index_offset);
+                        // face_varying_triangulate_indices.push(index_offset + i - 1);
+                        // face_varying_triangulate_indices.push(index_offset + i);
+                        // sub_mesh_indices.push(face_vertex_indices[index_offset] as u32);
+                        // sub_mesh_indices.push(face_vertex_indices[index_offset + i - 1] as u32);
+                        // sub_mesh_indices.push(face_vertex_indices[index_offset + i] as u32);
+                        sub_mesh_indices.push(index_offset as u32);
+                        sub_mesh_indices.push((index_offset + i - 1) as u32);
+                        sub_mesh_indices.push((index_offset + i) as u32);
+                    }
+                    used_face_indices.push(i as u64);
+                }
+                index_offset += face_vertex_count;
+            }
+            sub_meshes.push(SubMesh {
+                indices: sub_mesh_indices,
+            });
+        }
+
+        // geomSubsetに含まれなかったfaceをtriangulateしたindexによるsub meshを作る
+        let mut base_indices = Vec::new();
+        for i in 0..face_vertex_counts.len() {
+            if !used_face_indices.contains(&(i as u64)) {
+                base_indices.push(i as u64);
+            }
+        }
+        let mut sub_mesh_indices = Vec::new();
+        let mut index_offset = 0;
+        for (i, face_vertex_count) in face_vertex_counts.iter().enumerate() {
+            let face_vertex_count = *face_vertex_count as usize;
+            if base_indices.contains(&(i as u64)) {
+                for i in 2..face_vertex_count {
+                    // vertex_triangulate_indices.push(face_vertex_indices[index_offset] as usize);
+                    // vertex_triangulate_indices
+                    //     .push(face_vertex_indices[index_offset + i - 1] as usize);
+                    // vertex_triangulate_indices
+                    //     .push(face_vertex_indices[index_offset + i] as usize);
+                    // face_varying_triangulate_indices.push(index_offset);
+                    // face_varying_triangulate_indices.push(index_offset + i - 1);
+                    // face_varying_triangulate_indices.push(index_offset + i);
+                    sub_mesh_indices.push(index_offset as u32);
+                    sub_mesh_indices.push((index_offset + i - 1) as u32);
+                    sub_mesh_indices.push((index_offset + i) as u32);
+                }
+                used_face_indices.push(i as u64);
+            }
+            index_offset += face_vertex_count;
+        }
+        sub_meshes.push(SubMesh {
+            indices: sub_mesh_indices,
+        });
+
         Self {
-            left_handed: data.left_handed,
-            points_data: data.points_data.expect("MeshData has no points data"),
-            points_interpolation: data
-                .points_interpolation
-                .expect("MeshData has no points data"),
-            normals_data: data.normals_data,
-            normals_interpolation: data.normals_interpolation,
-            uvs_data: data.uvs_data,
-            uvs_interpolation: data.uvs_interpolation,
-            face_vertex_indices: data
-                .face_vertex_indices
-                .expect("MeshData has no face vertex indices data"),
-            face_vertex_counts: data
-                .face_vertex_counts
-                .expect("MeshData has no face vertex count data"),
+            vertices,
+            sub_meshes,
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DistantLightData {
-    pub intensity: f32,
-    pub color: [f32; 3],
-    pub angle: Option<f32>,
+/// シーンの変更点の差分情報の一つの要素
+pub enum SceneDiffItem {
+    MeshCreated(SdfPath, TransformMatrix, MeshData),
+    MeshDestroyed(SdfPath),
+    MeshTransformMatrixDirtied(SdfPath, TransformMatrix),
+    MeshDataDirtied(SdfPath, MeshData),
 }
-impl From<Box<bridge::DistantLightData>> for DistantLightData {
-    fn from(data: Box<bridge::DistantLightData>) -> Self {
-        Self {
-            intensity: data.intensity,
-            color: data.color,
-            angle: data.angle,
+
+/// シーンの変更点の差分情報全体
+pub struct SceneDiff {
+    /// シーンの変更点の差分情報の要素のリスト
+    pub items: Vec<SceneDiffItem>,
+}
+impl From<bridge::UsdDataDiff> for SceneDiff {
+    fn from(diff: bridge::UsdDataDiff) -> Self {
+        let mut items = Vec::new();
+
+        for (path, data) in diff.meshes.create {
+            items.push(SceneDiffItem::MeshCreated(
+                path,
+                TransformMatrix {
+                    matrix: data
+                        .transform_matrix
+                        .map_or(Mat4::IDENTITY, |data| Mat4::from_cols_array(&data)),
+                },
+                MeshData::new(
+                    data.left_handed.unwrap_or(false),
+                    data.points.unwrap(),
+                    data.normals,
+                    data.normals_interpolation,
+                    data.uvs,
+                    data.uvs_interpolation,
+                    data.face_vertex_indices.unwrap(),
+                    data.face_vertex_counts.unwrap(),
+                    data.geom_subsets,
+                ),
+            ));
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SphereLightData {
-    pub intensity: f32,
-    pub color: [f32; 3],
-    pub cone_angle: Option<f32>,
-    pub cone_softness: Option<f32>,
-}
-impl From<Box<bridge::SphereLightData>> for SphereLightData {
-    fn from(data: Box<bridge::SphereLightData>) -> Self {
-        Self {
-            intensity: data.intensity,
-            color: data.color,
-            cone_angle: data.cone_angle,
-            cone_softness: data.cone_softness,
+        for path in diff.meshes.destroy {
+            items.push(SceneDiffItem::MeshDestroyed(path));
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CameraData {
-    pub focal_length: f32,
-    pub vertical_aperture: f32,
-}
-impl From<Box<bridge::CameraData>> for CameraData {
-    fn from(data: Box<bridge::CameraData>) -> Self {
-        Self {
-            focal_length: data.focal_length,
-            vertical_aperture: data.vertical_aperture,
+        for (path, matrix) in diff.meshes.diff_transform_matrix {
+            items.push(SceneDiffItem::MeshTransformMatrixDirtied(
+                path,
+                TransformMatrix {
+                    matrix: Mat4::from_cols_array(&matrix),
+                },
+            ));
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RenderSettingsData {
-    pub render_product_paths: Vec<String>,
-}
-impl From<Box<bridge::RenderSettingsData>> for RenderSettingsData {
-    fn from(data: Box<bridge::RenderSettingsData>) -> Self {
-        Self {
-            render_product_paths: data.render_product_paths,
+        for (path, data) in diff.meshes.diff_mesh_data {
+            items.push(SceneDiffItem::MeshDataDirtied(
+                path,
+                MeshData::new(
+                    data.left_handed.unwrap_or(false),
+                    data.points.unwrap(),
+                    data.normals,
+                    data.normals_interpolation,
+                    data.uvs,
+                    data.uvs_interpolation,
+                    data.face_vertex_indices.unwrap(),
+                    data.face_vertex_counts.unwrap(),
+                    data.geom_subsets,
+                ),
+            ));
         }
+        Self { items }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RenderProductData {
-    pub camera_path: String,
-}
-impl From<Box<bridge::RenderProductData>> for RenderProductData {
-    fn from(data: Box<bridge::RenderProductData>) -> Self {
-        Self {
-            camera_path: data.camera_path,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct UsdSdfPath(pub String);
-impl Display for UsdSdfPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-pub enum BridgeData {
-    Message(String),
-    TimeCodeRange(f64, f64),
-    TransformMatrix(UsdSdfPath, [f32; 16]),
-    CreateMesh(UsdSdfPath),
-    MeshData(UsdSdfPath, MeshData),
-    DestroyMesh(UsdSdfPath),
-    CreateDistantLight(UsdSdfPath),
-    DistantLightData(UsdSdfPath, DistantLightData),
-    DestroyDistantLight(UsdSdfPath),
-    CreateSphereLight(UsdSdfPath),
-    SphereLightData(UsdSdfPath, SphereLightData),
-    DestroySphereLight(UsdSdfPath),
-    CreateCamera(UsdSdfPath),
-    CameraData(UsdSdfPath, CameraData),
-    DestroyCamera(UsdSdfPath),
-    CreateRenderSettings(UsdSdfPath),
-    RenderSettingsData(UsdSdfPath, RenderSettingsData),
-    DestroyRenderSettings(UsdSdfPath),
-    CreateRenderProduct(UsdSdfPath),
-    RenderProductData(UsdSdfPath, RenderProductData),
-    DestroyRenderProduct(UsdSdfPath),
-}
-
-pub struct UsdDataExtractor {
+pub struct UsdSceneExtractor {
     inner: cxx::UniquePtr<bridge::ffi::BridgeUsdDataExtractor>,
-    rx: Receiver<BridgeData>,
+    start_time_code: f64,
+    end_time_code: f64,
 }
-impl UsdDataExtractor {
+impl UsdSceneExtractor {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, String> {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let sender = Box::new(bridge::BridgeSender::new(tx));
-        let inner = bridge::ffi::new_usd_data_extractor(sender, path.as_ref().to_str().unwrap())
-            .map_err(|e| String::from(e.what()))?;
-        Ok(Self { inner, rx })
+        let path = path.as_ref().to_str().unwrap();
+        let inner = bridge::ffi::new_usd_data_extractor(path);
+        let inner = inner.map_err(|e| String::from(e.what()))?;
+        let start_time_code = inner.start_time_code();
+        let end_time_code = inner.end_time_code();
+        Ok(Self {
+            inner,
+            start_time_code,
+            end_time_code,
+        })
     }
 
-    pub fn extract(&mut self, time_code: f64) -> Vec<BridgeData> {
-        let (notifier, rx) = bridge::BridgeSendEndNotifier::new();
+    pub fn time_code_range(&self) -> (f64, f64) {
+        (self.start_time_code, self.end_time_code)
+    }
+
+    pub fn extract(&mut self, time_code: f64) -> SceneDiff {
         let inner = self.inner.pin_mut();
-        inner.extract(notifier, time_code);
-        let _ = rx.recv();
 
-        let mut data = vec![];
-        while let Ok(d) = self.rx.try_recv() {
-            data.push(d);
-        }
-        data
-    }
+        let mut usd_data_diff = bridge::UsdDataDiff::default();
+        let pin_usd_data_diff = std::pin::Pin::new(&mut usd_data_diff);
 
-    pub fn get_render_settings_paths(&self) -> Vec<String> {
-        self.inner.get_render_settings_paths()
-    }
+        inner.extract(time_code, pin_usd_data_diff);
 
-    pub fn set_render_settings_path(&mut self, path: &str) -> Result<(), String> {
-        let inner = self.inner.pin_mut();
-        inner
-            .set_render_settings_path(path)
-            .map_err(|e| String::from(e.what()))
-    }
-
-    pub fn clear_render_settings_path(&mut self) {
-        let inner = self.inner.pin_mut();
-        inner.clear_render_settings_path();
-    }
-
-    pub fn get_render_product_paths(&self) -> Result<Vec<String>, String> {
-        self.inner
-            .get_render_product_paths()
-            .map_err(|e| String::from(e.what()))
-    }
-
-    pub fn set_render_product_path(&mut self, path: &str) -> Result<(), String> {
-        let inner = self.inner.pin_mut();
-        inner
-            .set_render_product_path(path)
-            .map_err(|e| String::from(e.what()))
-    }
-
-    pub fn clear_render_product_path(&mut self) {
-        let inner = self.inner.pin_mut();
-        inner.clear_render_product_path();
-    }
-
-    pub fn get_active_camera_path(&self) -> Result<String, String> {
-        self.inner
-            .get_active_camera_path()
-            .map_err(|e| String::from(e.what()))
-    }
-
-    pub fn destroy(self) -> Vec<BridgeData> {
-        drop(self.inner);
-        let mut data = vec![];
-        while let Ok(d) = self.rx.try_recv() {
-            data.push(d);
-        }
-        data
+        usd_data_diff.into()
     }
 }

@@ -1980,8 +1980,10 @@ dependencies = [
 name = "usd_data_extractor"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "cxx",
  "cxx-build",
+ "glam",
  "glob",
  "oneshot",
  "vcvars",

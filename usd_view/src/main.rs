@@ -5,6 +5,7 @@ use winit::{
 };
 
 mod egui_renderer;
+mod render_scene;
 mod renderer;
 mod scene;
 mod scene_loader;

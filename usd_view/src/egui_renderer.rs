@@ -48,8 +48,8 @@ impl EguiRenderer {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         usd_filename: &mut String,
-        usd_time_code: &mut i64,
-        usd_time_code_range: std::ops::RangeInclusive<i64>,
+        time_code: &mut i64,
+        time_code_range: std::ops::RangeInclusive<i64>,
         load_button_clicked: &mut bool,
         render_settings_paths: Vec<String>,
         render_settings_path: &mut Option<String>,
@@ -97,7 +97,7 @@ impl EguiRenderer {
                     ui.style_mut().spacing.slider_width = 400.0;
                     ui.horizontal(|ui| {
                         ui.label("Time Code: ");
-                        ui.add(egui::Slider::new(usd_time_code, usd_time_code_range));
+                        ui.add(egui::Slider::new(time_code, time_code_range));
                     });
                 });
             });
