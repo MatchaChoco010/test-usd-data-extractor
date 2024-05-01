@@ -377,19 +377,11 @@ impl Renderer {
         });
 
         {
-            // let camera = Camera {
-            //     view: scene.camera.view_matrix,
-            //     projection: glam::Mat4::perspective_rh(
-            //         scene.camera.fovy,
-            //         size.width as f32 / size.height as f32,
-            //         0.01,
-            //         100.0,
-            //     ),
-            // };
+            let camera = scene.get_camera();
             let camera = Camera {
-                view: Mat4::look_at_rh(Vec3::new(0.0, 1.2, 5.0), Vec3::new(0.0, 1.0, 0.0), Vec3::Y),
+                view: Mat4::look_at_rh(camera.eye, camera.eye + camera.dir, Vec3::Y),
                 projection: Mat4::perspective_rh(
-                    60.0_f32.to_radians(),
+                    camera.fovy,
                     size.width as f32 / size.height as f32,
                     0.01,
                     100.0,

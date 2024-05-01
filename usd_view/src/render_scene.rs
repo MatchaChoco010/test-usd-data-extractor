@@ -154,6 +154,8 @@ pub struct RenderScene {
     meshes: HashMap<String, RenderSceneMeshData>,
     sphere_lights: HashMap<String, SphereLight>,
     distant_lights: HashMap<String, DistantLight>,
+    cameras: HashMap<String, Camera>,
+    active_camera: Option<String>,
 }
 impl RenderScene {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
@@ -163,6 +165,8 @@ impl RenderScene {
             meshes: HashMap::new(),
             sphere_lights: HashMap::new(),
             distant_lights: HashMap::new(),
+            cameras: HashMap::new(),
+            active_camera: None,
         }
     }
 
@@ -210,6 +214,26 @@ impl RenderScene {
 
     pub fn remove_distant_light(&mut self, name: String) {
         self.distant_lights.remove(&name);
+    }
+
+    pub fn insert_camera(&mut self, name: String, camera: Camera) {
+        self.cameras.insert(name, camera);
+    }
+
+    pub fn remove_camera(&mut self, name: String) {
+        self.cameras.remove(&name);
+    }
+
+    pub fn set_active_camera_path(&mut self, name: Option<String>) {
+        if let Some(name) = name {
+            if self.cameras.get(&name).is_some() {
+                self.active_camera = Some(name);
+            } else {
+                self.active_camera = None;
+            }
+        } else {
+            self.active_camera = None;
+        }
     }
 
     // === Get Render data ===
@@ -283,5 +307,17 @@ impl RenderScene {
             })
             .collect();
         (directional_lights, point_lights, spot_lights)
+    }
+
+    pub fn get_camera(&self) -> Camera {
+        if let Some(name) = &self.active_camera {
+            self.cameras.get(name).unwrap().clone()
+        } else {
+            Camera {
+                eye: Vec3::new(0.0, 1.2, 5.0),
+                dir: Vec3::new(0.0, 0.0, -1.0),
+                fovy: 60.0_f32.to_radians(),
+            }
+        }
     }
 }

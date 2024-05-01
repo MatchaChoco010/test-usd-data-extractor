@@ -299,6 +299,32 @@ impl DistantLight {
     }
 }
 
+/// USDから抽出したシーンのCameraの情報
+#[derive(Debug, Clone)]
+pub struct Camera {
+    pub eye: Vec3,
+    pub dir: Vec3,
+    pub fovy: f32,
+}
+impl Camera {
+    fn new(transform_matrix: Mat4, focal_length: f32, vertical_aperture: f32) -> Self {
+        let eye = transform_matrix.transform_point3(Vec3::ZERO);
+        let dir = transform_matrix.transform_vector3(Vec3::NEG_Z);
+        let fovy = 2.0 * (vertical_aperture / (2.0 * focal_length)).atan();
+        Self { eye, dir, fovy }
+    }
+}
+
+#[derive(Debug)]
+pub struct RenderProduct {
+    pub camera_path: String,
+}
+
+#[derive(Debug)]
+pub struct RenderSettings {
+    pub render_products: HashMap<String, RenderProduct>,
+}
+
 /// シーンの変更点の差分情報の一つの要素
 pub enum SceneDiffItem {
     MeshCreated(SdfPath, TransformMatrix, MeshData),
@@ -309,6 +335,10 @@ pub enum SceneDiffItem {
     SphereLightDestroyed(SdfPath),
     DistantLightAddOrUpdate(SdfPath, DistantLight),
     DistantLightDestroyed(SdfPath),
+    CameraAddOrUpdate(SdfPath, Camera),
+    CameraDestroyed(SdfPath),
+    RenderSettingsAddOrUpdate(SdfPath, RenderSettings),
+    RenderSettingsDestroyed(SdfPath),
 }
 
 /// シーンの変更点の差分情報全体
@@ -397,6 +427,39 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
         }
         for path in diff.distant_lights.destroy {
             items.push(SceneDiffItem::DistantLightDestroyed(path));
+        }
+
+        for (path, data) in diff.cameras.update {
+            items.push(SceneDiffItem::CameraAddOrUpdate(
+                path,
+                Camera::new(
+                    Mat4::from_cols_array(&data.transform_matrix.unwrap()),
+                    data.focal_length.unwrap(),
+                    data.vertical_aperture.unwrap(),
+                ),
+            ));
+        }
+        for path in diff.cameras.destroy {
+            items.push(SceneDiffItem::CameraDestroyed(path));
+        }
+
+        for (path, data) in diff.render_settings.update {
+            let mut render_products = HashMap::new();
+            for (product_name, product_data) in data.render_product {
+                render_products.insert(
+                    product_name,
+                    RenderProduct {
+                        camera_path: product_data.camera_path.into(),
+                    },
+                );
+            }
+            items.push(SceneDiffItem::RenderSettingsAddOrUpdate(
+                path,
+                RenderSettings { render_products },
+            ));
+        }
+        for path in diff.render_settings.destroy {
+            items.push(SceneDiffItem::RenderSettingsDestroyed(path));
         }
 
         Self { items }

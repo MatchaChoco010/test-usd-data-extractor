@@ -1,11 +1,13 @@
 #ifndef BRIDGE_SCENE_INDEX_OBSERVER_H
 #define BRIDGE_SCENE_INDEX_OBSERVER_H
 
+#include "cameraObserver.h"
 #include "distantLightObserver.h"
 #include "meshObserver.h"
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
 #include "pxr/pxr.h"
+#include "renderSettingsObserver.h"
 #include "sphereLightObserver.h"
 #include "usdDataDiff.h"
 #include <iostream>
@@ -36,9 +38,11 @@ public:
   void GetDiff(const HdSceneIndexBase& sender, UsdDataDiff& diff);
 
 private:
+  RenderSettingsObserver _renderSettingsObserver;
   MeshObserver _meshObserver;
   SphereLightObserver _sphereLightObserver;
   DistantLightObserver _distantLightObserver;
+  CameraObserver _cameraObserver;
 
   // This class does not support copying.
   HdBridgeSceneIndexObserver(const HdBridgeSceneIndexObserver&) = delete;

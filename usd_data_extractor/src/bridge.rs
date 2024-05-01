@@ -81,6 +81,27 @@ pub mod ffi {
 
         // distant lightが削除されたdiffを記録する関数
         fn destroy_distant_light(&mut self, path: String);
+
+        // cameraが生成/更新されたdiffの記録とそのデータを設定する関数
+        fn add_or_update_camera(&mut self, path: String);
+        fn add_or_update_camera_transform_matrix(&mut self, path: String, matrix: &[f32]);
+        fn add_or_update_camera_focal_length(&mut self, path: String, fov: f32);
+        fn add_or_update_camera_vertical_aperture(&mut self, path: String, aperture: f32);
+
+        // cameraが削除されたdiffを記録する関数
+        fn destroy_camera(&mut self, path: String);
+
+        // render settingsが生成/更新されたdiffの記録とそのデータを設定する関数
+        fn add_or_update_render_settings(&mut self, path: String);
+        fn add_or_update_render_settings_render_product(
+            &mut self,
+            path: String,
+            product_path: String,
+            camera_path: String,
+        );
+
+        // render settingsが削除されたdiffを記録する関数
+        fn destroy_render_settings(&mut self, path: String);
     }
     unsafe extern "C++" {
         include!("usd_data_extractor/cpp/usdDataExtractor.h");
@@ -99,7 +120,7 @@ pub mod ffi {
 
 pub use ffi::Interpolation;
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Default, Hash, PartialEq, Eq)]
 pub struct SdfPath(String);
 impl Into<String> for SdfPath {
     fn into(self) -> String {
@@ -171,10 +192,41 @@ pub struct DistantLightsDiff {
 }
 
 #[derive(Debug, Default)]
+pub struct CameraData {
+    pub transform_matrix: Option<[f32; 16]>,
+    pub focal_length: Option<f32>,
+    pub vertical_aperture: Option<f32>,
+}
+
+#[derive(Debug, Default)]
+pub struct CamerasDiff {
+    pub update: HashMap<SdfPath, CameraData>,
+    pub destroy: Vec<SdfPath>,
+}
+
+#[derive(Debug, Default)]
+pub struct RenderProductData {
+    pub camera_path: SdfPath,
+}
+
+#[derive(Debug, Default)]
+pub struct RenderSettingsData {
+    pub render_product: HashMap<String, RenderProductData>,
+}
+
+#[derive(Debug, Default)]
+pub struct RenderSettingsDiff {
+    pub update: HashMap<SdfPath, RenderSettingsData>,
+    pub destroy: Vec<SdfPath>,
+}
+
+#[derive(Debug, Default)]
 pub struct UsdDataDiff {
     pub meshes: MeshesDiff,
     pub sphere_lights: SphereLightsDiff,
     pub distant_lights: DistantLightsDiff,
+    pub cameras: CamerasDiff,
+    pub render_settings: RenderSettingsDiff,
 }
 impl UsdDataDiff {
     // === Mesh ===
@@ -401,5 +453,64 @@ impl UsdDataDiff {
 
     fn destroy_distant_light(&mut self, path: String) {
         self.distant_lights.destroy.push(SdfPath(path));
+    }
+
+    // === Camera ===
+
+    fn add_or_update_camera(&mut self, path: String) {
+        self.cameras
+            .update
+            .insert(SdfPath(path), CameraData::default());
+    }
+
+    fn add_or_update_camera_transform_matrix(&mut self, path: String, matrix: &[f32]) {
+        let data = matrix[0..16].try_into().unwrap();
+        if let Some(create) = self.cameras.update.get_mut(&SdfPath(path)) {
+            create.transform_matrix = Some(data);
+        }
+    }
+
+    fn add_or_update_camera_focal_length(&mut self, path: String, fov: f32) {
+        if let Some(create) = self.cameras.update.get_mut(&SdfPath(path)) {
+            create.focal_length = Some(fov);
+        }
+    }
+
+    fn add_or_update_camera_vertical_aperture(&mut self, path: String, aperture: f32) {
+        if let Some(create) = self.cameras.update.get_mut(&SdfPath(path)) {
+            create.vertical_aperture = Some(aperture);
+        }
+    }
+
+    fn destroy_camera(&mut self, path: String) {
+        self.cameras.destroy.push(SdfPath(path));
+    }
+
+    // === Render Settings ===
+
+    fn add_or_update_render_settings(&mut self, path: String) {
+        self.render_settings
+            .update
+            .insert(SdfPath(path), RenderSettingsData::default());
+    }
+
+    fn add_or_update_render_settings_render_product(
+        &mut self,
+        path: String,
+        product_path: String,
+        camera_path: String,
+    ) {
+        if let Some(create) = self.render_settings.update.get_mut(&SdfPath(path)) {
+            create.render_product.insert(
+                product_path,
+                RenderProductData {
+                    camera_path: SdfPath(camera_path),
+                },
+            );
+        }
+    }
+
+    fn destroy_render_settings(&mut self, path: String) {
+        self.render_settings.destroy.push(SdfPath(path));
     }
 }
