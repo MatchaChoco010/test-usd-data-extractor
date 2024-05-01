@@ -72,6 +72,15 @@ pub mod ffi {
 
         // sphere lightが削除されたdiffを記録する関数
         fn destroy_sphere_light(&mut self, path: String);
+
+        // distant lightが生成/更新されたdiffの記録とそのデータを設定する関数
+        fn add_or_update_distant_light(&mut self, path: String);
+        fn add_or_update_distant_light_transform_matrix(&mut self, path: String, matrix: &[f32]);
+        fn add_or_update_distant_light_color(&mut self, path: String, r: f32, g: f32, b: f32);
+        fn add_or_update_distant_light_intensity(&mut self, path: String, intensity: f32);
+
+        // distant lightが削除されたdiffを記録する関数
+        fn destroy_distant_light(&mut self, path: String);
     }
     unsafe extern "C++" {
         include!("usd_data_extractor/cpp/usdDataExtractor.h");
@@ -149,9 +158,23 @@ pub struct SphereLightsDiff {
 }
 
 #[derive(Debug, Default)]
+pub struct DistantLightData {
+    pub transform_matrix: Option<[f32; 16]>,
+    pub color: Option<[f32; 3]>,
+    pub intensity: Option<f32>,
+}
+
+#[derive(Debug, Default)]
+pub struct DistantLightsDiff {
+    pub update: HashMap<SdfPath, DistantLightData>,
+    pub destroy: Vec<SdfPath>,
+}
+
+#[derive(Debug, Default)]
 pub struct UsdDataDiff {
     pub meshes: MeshesDiff,
     pub sphere_lights: SphereLightsDiff,
+    pub distant_lights: DistantLightsDiff,
 }
 impl UsdDataDiff {
     // === Mesh ===
@@ -347,5 +370,36 @@ impl UsdDataDiff {
 
     fn destroy_sphere_light(&mut self, path: String) {
         self.sphere_lights.destroy.push(SdfPath(path));
+    }
+
+    // === Distant Light ===
+
+    fn add_or_update_distant_light(&mut self, path: String) {
+        self.distant_lights
+            .update
+            .insert(SdfPath(path), DistantLightData::default());
+    }
+
+    fn add_or_update_distant_light_transform_matrix(&mut self, path: String, matrix: &[f32]) {
+        let data = matrix[0..16].try_into().unwrap();
+        if let Some(create) = self.distant_lights.update.get_mut(&SdfPath(path)) {
+            create.transform_matrix = Some(data);
+        }
+    }
+
+    fn add_or_update_distant_light_color(&mut self, path: String, r: f32, g: f32, b: f32) {
+        if let Some(create) = self.distant_lights.update.get_mut(&SdfPath(path)) {
+            create.color = Some([r, g, b]);
+        }
+    }
+
+    fn add_or_update_distant_light_intensity(&mut self, path: String, intensity: f32) {
+        if let Some(create) = self.distant_lights.update.get_mut(&SdfPath(path)) {
+            create.intensity = Some(intensity);
+        }
+    }
+
+    fn destroy_distant_light(&mut self, path: String) {
+        self.distant_lights.destroy.push(SdfPath(path));
     }
 }

@@ -1,12 +1,12 @@
-#include "sphereLightObserver.h"
+#include "distantLightObserver.h"
 #include "usd_data_extractor/src/bridge.rs.h"
 
-SphereLightObserver::SphereLightObserver() {}
+DistantLightObserver::DistantLightObserver() {}
 
-SphereLightObserver::~SphereLightObserver() {}
+DistantLightObserver::~DistantLightObserver() {}
 
 void
-SphereLightObserver::PrimsAdded(
+DistantLightObserver::PrimsAdded(
   const HdSceneIndexBase& sender,
   const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
@@ -17,7 +17,7 @@ SphereLightObserver::PrimsAdded(
       continue;
     }
 
-    // stageに追加されたSphereLightを記録する
+    // stageに追加されたDistantLightを記録する
     _lightPaths.insert(entry.primPath);
 
     if (_removed.find(entry.primPath) != _removed.end()) {
@@ -31,14 +31,14 @@ SphereLightObserver::PrimsAdded(
       _dirtied.erase(entry.primPath);
       _added.emplace(entry.primPath);
     } else {
-      // _addedされたSphereLightとしてdiffに登録する
+      // _addedされたDistantLightとしてdiffに登録する
       _added.emplace(entry.primPath);
     }
   }
 }
 
 void
-SphereLightObserver::PrimsRemoved(
+DistantLightObserver::PrimsRemoved(
   const HdSceneIndexBase& sender,
   const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
@@ -48,7 +48,7 @@ SphereLightObserver::PrimsRemoved(
       continue;
     }
 
-    // stageから削除されたSphereLightを記録から削除する
+    // stageから削除されたDistantLightを記録から削除する
     _lightPaths.erase(entry.primPath);
 
     if (_added.find(entry.primPath) != _added.end()) {
@@ -61,14 +61,14 @@ SphereLightObserver::PrimsRemoved(
       _dirtied.erase(entry.primPath);
       _removed.emplace(entry.primPath);
     } else {
-      // _removedされたSphereLightとしてdiffに登録する
+      // _removedされたDistantLightとしてdiffに登録する
       _removed.emplace(entry.primPath);
     }
   }
 }
 
 void
-SphereLightObserver::PrimsDirtied(
+DistantLightObserver::PrimsDirtied(
   const HdSceneIndexBase& sender,
   const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
@@ -79,7 +79,7 @@ SphereLightObserver::PrimsDirtied(
     }
 
     // このフレーム中でaddedな場合は、addedですべての情報を送るので追加で差分を送る必要はない
-    // そのため、addedされたSphereLightの場合はdirtiedを無視する
+    // そのため、addedされたDistantLightの場合はdirtiedを無視する
     if (_added.find(entry.primPath) != _added.end()) {
       continue;
     }
@@ -90,17 +90,17 @@ SphereLightObserver::PrimsDirtied(
 }
 
 void
-SphereLightObserver::PrimsRenamed(
+DistantLightObserver::PrimsRenamed(
   const HdSceneIndexBase& sender,
   const HdSceneIndexObserver::RenamedPrimEntries& entries)
 {
   for (const auto entry : entries) {
-    // SphereLightPathに記録されていない場合は無視する
+    // DistantLightPathに記録されていない場合は無視する
     if (_lightPaths.find(entry.oldPrimPath) == _lightPaths.end()) {
       continue;
     }
 
-    // stageからrenameされたSphereLightを記録から削除し、新しい名前で記録する
+    // stageからrenameされたDistantLightを記録から削除し、新しい名前で記録する
     _lightPaths.erase(entry.oldPrimPath);
     _lightPaths.insert(entry.newPrimPath);
 
@@ -116,7 +116,7 @@ SphereLightObserver::PrimsRenamed(
         _dirtied.erase(entry.oldPrimPath);
         _removed.emplace(entry.oldPrimPath);
       } else {
-        // _removedされたSphereLightとしてdiffに登録する
+        // _removedされたDistantLightとしてdiffに登録する
         _removed.emplace(entry.oldPrimPath);
       }
     }
@@ -134,7 +134,7 @@ SphereLightObserver::PrimsRenamed(
         _dirtied.erase(entry.newPrimPath);
         _added.emplace(entry.newPrimPath);
       } else {
-        // _addedされたSphereLightとしてdiffに登録する
+        // _addedされたDistantLightとしてdiffに登録する
         _added.emplace(entry.newPrimPath);
       }
     }
@@ -142,7 +142,7 @@ SphereLightObserver::PrimsRenamed(
 }
 
 void
-SphereLightObserver::ClearDiff()
+DistantLightObserver::ClearDiff()
 {
   // 各種diffの記録をクリアする
   _added.clear();
@@ -151,13 +151,13 @@ SphereLightObserver::ClearDiff()
 }
 
 void
-SphereLightObserver::_UpdateDiff(const HdSceneIndexBase& sceneIndex,
-                                 UsdDataDiff& diff,
-                                 const SdfPath path) const
+DistantLightObserver::_UpdateDiff(const HdSceneIndexBase& sceneIndex,
+                                  UsdDataDiff& diff,
+                                  const SdfPath path) const
 {
   auto pathString = rust::String(path.GetText());
 
-  diff.add_or_update_sphere_light(pathString);
+  diff.add_or_update_distant_light(pathString);
 
   auto transformMatrixSource =
     sceneIndex.GetDataSource(path, TransformMatrixLocator);
@@ -172,7 +172,7 @@ SphereLightObserver::_UpdateDiff(const HdSceneIndexBase& sceneIndex,
       matrixData[i] = matrixArray[i];
     }
     auto data = rust::Slice<const float>(matrixData.data(), 16);
-    diff.add_or_update_sphere_light_transform_matrix(pathString, data);
+    diff.add_or_update_distant_light_transform_matrix(pathString, data);
   }
 
   auto materialTerminalSource =
@@ -190,7 +190,7 @@ SphereLightObserver::_UpdateDiff(const HdSceneIndexBase& sceneIndex,
       auto sampledColorSource = HdSampledDataSource::Cast(colorSource);
       auto value = sampledColorSource->GetValue(0);
       auto color = value.Get<GfVec3f>();
-      diff.add_or_update_sphere_light_color(
+      diff.add_or_update_distant_light_color(
         pathString, color[0], color[1], color[2]);
     }
 
@@ -201,47 +201,27 @@ SphereLightObserver::_UpdateDiff(const HdSceneIndexBase& sceneIndex,
       auto sampledIntensitySource = HdSampledDataSource::Cast(intensitySource);
       auto value = sampledIntensitySource->GetValue(0);
       auto intensity = value.Get<float>();
-      diff.add_or_update_sphere_light_intensity(pathString, intensity);
-    }
-
-    auto angleLocator =
-      MaterialNodesLocator.Append(terminal).Append(AngleParameterLocator);
-    auto angleSource = sceneIndex.GetDataSource(path, angleLocator);
-    if (angleSource) {
-      auto sampledAngleSource = HdSampledDataSource::Cast(angleSource);
-      auto value = sampledAngleSource->GetValue(0);
-      auto angle = value.Get<float>();
-      diff.add_or_update_sphere_light_cone_angle(pathString, angle);
-    }
-
-    auto softnessLocator =
-      MaterialNodesLocator.Append(terminal).Append(SoftnessParameterLocator);
-    auto softnessSource = sceneIndex.GetDataSource(path, softnessLocator);
-    if (softnessSource) {
-      auto sampledSoftnessSource = HdSampledDataSource::Cast(softnessSource);
-      auto value = sampledSoftnessSource->GetValue(0);
-      auto softness = value.Get<float>();
-      diff.add_or_update_sphere_light_cone_softness(pathString, softness);
+      diff.add_or_update_distant_light_intensity(pathString, intensity);
     }
   }
 }
 
 void
-SphereLightObserver::GetDiff(const HdSceneIndexBase& sceneIndex,
-                             UsdDataDiff& diff)
+DistantLightObserver::GetDiff(const HdSceneIndexBase& sceneIndex,
+                              UsdDataDiff& diff)
 {
-  // addedされたSphereLightの情報をdiffに登録する
+  // addedされたDistantLightの情報をdiffに登録する
   for (const auto& path : _added) {
     _UpdateDiff(sceneIndex, diff, path);
   }
 
-  // removedされたSphereLightの情報をdiffに登録する
+  // removedされたDistantLightの情報をdiffに登録する
   for (const auto& path : _removed) {
     auto pathString = rust::String(path.GetText());
-    diff.destroy_sphere_light(pathString);
+    diff.destroy_distant_light(pathString);
   }
 
-  // dirtiedされたSphereLightの情報をdiffに登録する
+  // dirtiedされたDistantLightの情報をdiffに登録する
   for (const auto& path : _dirtied) {
     _UpdateDiff(sceneIndex, diff, path);
   }

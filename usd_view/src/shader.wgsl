@@ -10,7 +10,6 @@ struct DirectionalLight {
     direction: vec3<f32>,
     intensity: f32,
     color: vec3<f32>,
-    angle: f32,
 };
 struct DirectionalLightsUniform {
     lights: array<DirectionalLight, 4>,

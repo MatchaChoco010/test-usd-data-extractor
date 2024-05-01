@@ -1,5 +1,5 @@
-#ifndef SPHERE_LIGHT_OBSERVER_H
-#define SPHERE_LIGHT_OBSERVER_H
+#ifndef DISTANT_LIGHT_OBSERVER_H
+#define DISTANT_LIGHT_OBSERVER_H
 
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
@@ -11,15 +11,15 @@
 
 using namespace pxr;
 
-// primTypeがsphereLightの情報を処理してRustにdiffを受け渡すためのクラス。
-class SphereLightObserver
+// primTypeがDistantLightの情報を処理してRustにdiffを受け渡すためのクラス。
+class DistantLightObserver
 {
 
 public:
-  SphereLightObserver();
-  virtual ~SphereLightObserver();
+  DistantLightObserver();
+  virtual ~DistantLightObserver();
 
-  inline static const TfToken TypeToken = TfToken("sphereLight");
+  inline static const TfToken TypeToken = TfToken("distantLight");
 
   inline static const HdDataSourceLocator TransforLocator =
     HdDataSourceLocator(TfToken("xform"));
@@ -44,14 +44,6 @@ public:
     HdDataSourceLocator(TfToken("parameters"),
                         TfToken("intensity"),
                         TfToken("value"));
-  inline static const HdDataSourceLocator AngleParameterLocator =
-    HdDataSourceLocator(TfToken("parameters"),
-                        TfToken("shaping:cone:angle"),
-                        TfToken("value"));
-  inline static const HdDataSourceLocator SoftnessParameterLocator =
-    HdDataSourceLocator(TfToken("parameters"),
-                        TfToken("shaping:cone:softness"),
-                        TfToken("value"));
 
   void PrimsAdded(const HdSceneIndexBase& sender,
                   const HdSceneIndexObserver::AddedPrimEntries& entries);
@@ -70,14 +62,14 @@ public:
   void GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff);
 
 private:
-  // stageに存在するSphereLightのPathを記録する
+  // stageに存在するDistantLightのPathを記録する
   std::set<SdfPath> _lightPaths;
 
-  // 前回GetDiffしてClearしてから追加されたSphereLightの差分のPathを記録する
+  // 前回GetDiffしてClearしてから追加されたDistantLightの差分のPathを記録する
   std::set<SdfPath> _added;
-  // 前回GetDiffしてClearしてから削除されたSphereLightのPathを記録する
+  // 前回GetDiffしてClearしてから削除されたDistantLightのPathを記録する
   std::set<SdfPath> _removed;
-  // 前回までにGetDiffで追加されたSphereLightを記録する
+  // 前回までにGetDiffで追加されたDistantLightを記録する
   std::set<SdfPath> _dirtied;
 
   void _UpdateDiff(const HdSceneIndexBase& sceneIndex,
@@ -85,8 +77,8 @@ private:
                    const SdfPath path) const;
 
   // This class does not support copying.
-  SphereLightObserver(const SphereLightObserver&) = delete;
-  SphereLightObserver& operator=(const SphereLightObserver&) = delete;
+  DistantLightObserver(const DistantLightObserver&) = delete;
+  DistantLightObserver& operator=(const DistantLightObserver&) = delete;
 };
 
 #endif

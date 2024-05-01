@@ -124,7 +124,7 @@ pub struct RenderDirectionalLight {
     pub direction: Vec3,
     pub intensity: f32,
     pub color: Vec3,
-    pub angle: f32,
+    pub _padding: u32,
 }
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -153,6 +153,7 @@ pub struct RenderScene {
     queue: Arc<wgpu::Queue>,
     meshes: HashMap<String, RenderSceneMeshData>,
     sphere_lights: HashMap<String, SphereLight>,
+    distant_lights: HashMap<String, DistantLight>,
 }
 impl RenderScene {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
@@ -161,6 +162,7 @@ impl RenderScene {
             queue,
             meshes: HashMap::new(),
             sphere_lights: HashMap::new(),
+            distant_lights: HashMap::new(),
         }
     }
 
@@ -194,12 +196,20 @@ impl RenderScene {
         }
     }
 
+    pub fn insert_sphere_light(&mut self, name: String, light: SphereLight) {
+        self.sphere_lights.insert(name, light);
+    }
+
     pub fn remove_sphere_light(&mut self, name: String) {
         self.sphere_lights.remove(&name);
     }
 
-    pub fn insert_sphere_light(&mut self, name: String, light: SphereLight) {
-        self.sphere_lights.insert(name, light);
+    pub fn insert_distant_light(&mut self, name: String, light: DistantLight) {
+        self.distant_lights.insert(name, light);
+    }
+
+    pub fn remove_distant_light(&mut self, name: String) {
+        self.distant_lights.remove(&name);
     }
 
     // === Get Render data ===
@@ -228,7 +238,16 @@ impl RenderScene {
         Vec<RenderPointLight>,
         Vec<RenderSpotLight>,
     ) {
-        let directional_lights = Vec::new();
+        let directional_lights = self
+            .distant_lights
+            .iter()
+            .map(|(_, light)| RenderDirectionalLight {
+                direction: light.direction,
+                intensity: light.intensity,
+                color: light.color,
+                _padding: 0,
+            })
+            .collect();
         let point_lights = self
             .sphere_lights
             .iter()

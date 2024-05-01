@@ -281,6 +281,24 @@ impl SphereLight {
     }
 }
 
+/// USDから抽出したシーンのDistantLightの情報
+#[derive(Debug)]
+pub struct DistantLight {
+    pub direction: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+}
+impl DistantLight {
+    fn new(transform_matrix: Mat4, intensity: f32, color: Vec3) -> Self {
+        let direction = transform_matrix.transform_vector3(Vec3::Z);
+        Self {
+            direction,
+            intensity,
+            color,
+        }
+    }
+}
+
 /// シーンの変更点の差分情報の一つの要素
 pub enum SceneDiffItem {
     MeshCreated(SdfPath, TransformMatrix, MeshData),
@@ -289,6 +307,8 @@ pub enum SceneDiffItem {
     MeshDataDirtied(SdfPath, MeshData),
     SphereLightAddOrUpdate(SdfPath, SphereLight),
     SphereLightDestroyed(SdfPath),
+    DistantLightAddOrUpdate(SdfPath, DistantLight),
+    DistantLightDestroyed(SdfPath),
 }
 
 /// シーンの変更点の差分情報全体
@@ -363,6 +383,20 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
         }
         for path in diff.sphere_lights.destroy {
             items.push(SceneDiffItem::SphereLightDestroyed(path));
+        }
+
+        for (path, data) in diff.distant_lights.update {
+            items.push(SceneDiffItem::DistantLightAddOrUpdate(
+                path,
+                DistantLight::new(
+                    Mat4::from_cols_array(&data.transform_matrix.unwrap()),
+                    data.intensity.unwrap(),
+                    Vec3::from(data.color.unwrap()),
+                ),
+            ));
+        }
+        for path in diff.distant_lights.destroy {
+            items.push(SceneDiffItem::DistantLightDestroyed(path));
         }
 
         Self { items }

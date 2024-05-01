@@ -1,6 +1,7 @@
 #ifndef BRIDGE_SCENE_INDEX_OBSERVER_H
 #define BRIDGE_SCENE_INDEX_OBSERVER_H
 
+#include "distantLightObserver.h"
 #include "meshObserver.h"
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
@@ -37,6 +38,7 @@ public:
 private:
   MeshObserver _meshObserver;
   SphereLightObserver _sphereLightObserver;
+  DistantLightObserver _distantLightObserver;
 
   // This class does not support copying.
   HdBridgeSceneIndexObserver(const HdBridgeSceneIndexObserver&) = delete;
