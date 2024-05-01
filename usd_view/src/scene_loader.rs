@@ -231,6 +231,12 @@ impl UsdSceneExtractorTask {
                 SceneDiffItem::MeshDataDirtied(path, mesh_data) => {
                     scene.update_mesh_data(path.into(), mesh_data);
                 }
+                SceneDiffItem::SphereLightAddOrUpdate(path, light) => {
+                    scene.insert_sphere_light(path.into(), light);
+                }
+                SceneDiffItem::SphereLightDestroyed(path) => {
+                    scene.remove_sphere_light(path.into());
+                }
             }
         }
 

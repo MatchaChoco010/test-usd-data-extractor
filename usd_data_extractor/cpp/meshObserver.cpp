@@ -170,7 +170,7 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
     diff.create_mesh(pathString);
 
     auto transformMatrixSource =
-      sceneIndex.GetDataSource(path, TransformMatrixDataLocator);
+      sceneIndex.GetDataSource(path, TransformMatrixLocator);
     if (transformMatrixSource) {
       auto sampledTransformMatrixSource =
         HdSampledDataSource::Cast(transformMatrixSource);
@@ -370,7 +370,7 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
       if (diffType == DiffType::TransformMatrix) {
         // transformのmatrixを再取得する
         auto transformMatrixSource =
-          sceneIndex.GetDataSource(path, TransformMatrixDataLocator);
+          sceneIndex.GetDataSource(path, TransformMatrixLocator);
         if (transformMatrixSource) {
           auto sampledTransformMatrixSource =
             HdSampledDataSource::Cast(transformMatrixSource);

@@ -42,7 +42,7 @@ public:
   inline static const HdDataSourceLocator MeshLocator =
     HdDataSourceLocator(TfToken("mesh"));
 
-  inline static const HdDataSourceLocator TransformMatrixDataLocator =
+  inline static const HdDataSourceLocator TransformMatrixLocator =
     HdDataSourceLocator(TfToken("xform"), TfToken("matrix"));
   inline static const HdDataSourceLocator LeftHandedDataLocator =
     HdDataSourceLocator(TfToken("mesh"),

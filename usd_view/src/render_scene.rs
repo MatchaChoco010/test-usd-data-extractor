@@ -1,3 +1,4 @@
+use glam::Vec3;
 use std::collections::HashMap;
 use std::sync::Arc;
 use usd_data_extractor::*;
@@ -117,11 +118,41 @@ pub struct RenderMesh<'a> {
     pub index_count: u32,
 }
 
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct RenderDirectionalLight {
+    pub direction: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub angle: f32,
+}
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct RenderPointLight {
+    pub position: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub _padding: u32,
+}
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct RenderSpotLight {
+    pub position: Vec3,
+    pub intensity: f32,
+    pub direction: Vec3,
+    pub angle: f32,
+    pub color: Vec3,
+    pub softness: f32,
+}
+
 #[derive(Debug)]
 pub struct RenderScene {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     meshes: HashMap<String, RenderSceneMeshData>,
+    sphere_lights: HashMap<String, SphereLight>,
 }
 impl RenderScene {
     pub fn new(device: Arc<wgpu::Device>, queue: Arc<wgpu::Queue>) -> Self {
@@ -129,8 +160,11 @@ impl RenderScene {
             device,
             queue,
             meshes: HashMap::new(),
+            sphere_lights: HashMap::new(),
         }
     }
+
+    // === Update data ===
 
     pub fn add_mesh(&mut self, name: String, transform_matrix: TransformMatrix, mesh: MeshData) {
         let mut mesh_data =
@@ -160,6 +194,16 @@ impl RenderScene {
         }
     }
 
+    pub fn remove_sphere_light(&mut self, name: String) {
+        self.sphere_lights.remove(&name);
+    }
+
+    pub fn insert_sphere_light(&mut self, name: String, light: SphereLight) {
+        self.sphere_lights.insert(name, light);
+    }
+
+    // === Get Render data ===
+
     pub fn get_render_meshes<'a>(&'a self) -> Vec<RenderMesh<'a>> {
         self.meshes
             .iter()
@@ -175,5 +219,50 @@ impl RenderScene {
                     })
             })
             .collect()
+    }
+
+    pub fn get_lights(
+        &self,
+    ) -> (
+        Vec<RenderDirectionalLight>,
+        Vec<RenderPointLight>,
+        Vec<RenderSpotLight>,
+    ) {
+        let directional_lights = Vec::new();
+        let point_lights = self
+            .sphere_lights
+            .iter()
+            .filter_map(|(_, light)| {
+                if light.is_spot {
+                    None
+                } else {
+                    Some(RenderPointLight {
+                        position: light.position,
+                        intensity: light.intensity,
+                        color: light.color,
+                        _padding: 0,
+                    })
+                }
+            })
+            .collect();
+        let spot_lights = self
+            .sphere_lights
+            .iter()
+            .filter_map(|(_, light)| {
+                if light.is_spot {
+                    Some(RenderSpotLight {
+                        position: light.position,
+                        intensity: light.intensity,
+                        direction: light.direction.unwrap(),
+                        angle: light.cone_angle.unwrap(),
+                        color: light.color,
+                        softness: light.cone_softness.unwrap(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        (directional_lights, point_lights, spot_lights)
     }
 }

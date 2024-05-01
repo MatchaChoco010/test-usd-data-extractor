@@ -5,6 +5,7 @@
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
 #include "pxr/pxr.h"
+#include "sphereLightObserver.h"
 #include "usdDataDiff.h"
 #include <iostream>
 
@@ -35,6 +36,7 @@ public:
 
 private:
   MeshObserver _meshObserver;
+  SphereLightObserver _sphereLightObserver;
 
   // This class does not support copying.
   HdBridgeSceneIndexObserver(const HdBridgeSceneIndexObserver&) = delete;

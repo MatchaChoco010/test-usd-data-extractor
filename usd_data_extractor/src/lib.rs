@@ -6,105 +6,6 @@ mod bridge;
 
 pub use bridge::{Interpolation, SdfPath};
 
-// #[derive(Debug, Clone)]
-// pub enum Interpolation {
-//     Constant,
-//     Uniform,
-//     Varying,
-//     Vertex,
-//     FaceVarying,
-//     Instance,
-// }
-// impl From<u8> for Interpolation {
-//     fn from(i: u8) -> Self {
-//         match i {
-//             0 => Interpolation::Constant,
-//             1 => Interpolation::Uniform,
-//             2 => Interpolation::Varying,
-//             3 => Interpolation::Vertex,
-//             4 => Interpolation::FaceVarying,
-//             5 => Interpolation::Instance,
-//             _ => panic!("Invalid interpolation value: {}", i),
-//         }
-//     }
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct MeshData {
-//     pub left_handed: bool,
-//     pub points_data: Vec<f32>,
-//     pub points_interpolation: Interpolation,
-//     pub normals_data: Option<Vec<f32>>,
-//     pub normals_interpolation: Option<Interpolation>,
-//     pub uvs_data: Option<Vec<f32>>,
-//     pub uvs_interpolation: Option<Interpolation>,
-//     pub face_vertex_indices: Vec<u64>,
-//     pub face_vertex_counts: Vec<u32>,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct DistantLightData {
-//     pub intensity: f32,
-//     pub color: [f32; 3],
-//     pub angle: Option<f32>,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct SphereLightData {
-//     pub intensity: f32,
-//     pub color: [f32; 3],
-//     pub cone_angle: Option<f32>,
-//     pub cone_softness: Option<f32>,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct CameraData {
-//     pub focal_length: f32,
-//     pub vertical_aperture: f32,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct RenderSettingsData {
-//     pub render_product_paths: Vec<String>,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct RenderProductData {
-//     pub camera_path: String,
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct UsdSdfPath(pub String);
-// impl Display for UsdSdfPath {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{}", self.0)
-//     }
-// }
-
-// pub enum BridgeData {
-//     Message(String),
-//     TimeCodeRange(f64, f64),
-//     TransformMatrix(UsdSdfPath, [f32; 16]),
-//     CreateMesh(UsdSdfPath),
-//     MeshData(UsdSdfPath, MeshData),
-//     DestroyMesh(UsdSdfPath),
-//     CreateDistantLight(UsdSdfPath),
-//     DistantLightData(UsdSdfPath, DistantLightData),
-//     DestroyDistantLight(UsdSdfPath),
-//     CreateSphereLight(UsdSdfPath),
-//     SphereLightData(UsdSdfPath, SphereLightData),
-//     DestroySphereLight(UsdSdfPath),
-//     CreateCamera(UsdSdfPath),
-//     CameraData(UsdSdfPath, CameraData),
-//     DestroyCamera(UsdSdfPath),
-//     CreateRenderSettings(UsdSdfPath),
-//     RenderSettingsData(UsdSdfPath, RenderSettingsData),
-//     DestroyRenderSettings(UsdSdfPath),
-//     CreateRenderProduct(UsdSdfPath),
-//     RenderProductData(UsdSdfPath, RenderProductData),
-//     DestroyRenderProduct(UsdSdfPath),
-// }
-
 /// USDから抽出したシーンのtransform matrixの情報
 #[derive(Debug)]
 pub struct TransformMatrix {
@@ -335,12 +236,59 @@ impl MeshData {
     }
 }
 
+/// USDから抽出したシーンのSphereLightの情報
+#[derive(Debug)]
+pub struct SphereLight {
+    pub is_spot: bool,
+    pub position: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub direction: Option<Vec3>,
+    pub cone_angle: Option<f32>,
+    pub cone_softness: Option<f32>,
+}
+impl SphereLight {
+    fn new(
+        transform_matrix: Mat4,
+        intensity: f32,
+        color: Vec3,
+        cone_angle: Option<f32>,
+        cone_softness: Option<f32>,
+    ) -> Self {
+        let position = transform_matrix.transform_point3(Vec3::ZERO);
+        if let (Some(cone_angle), Some(cone_softness)) = (cone_angle, cone_softness) {
+            let direction = transform_matrix.transform_vector3(Vec3::Z);
+            Self {
+                is_spot: true,
+                position,
+                intensity,
+                color,
+                direction: Some(direction),
+                cone_angle: Some(cone_angle),
+                cone_softness: Some(cone_softness),
+            }
+        } else {
+            Self {
+                is_spot: false,
+                position,
+                intensity,
+                color,
+                direction: None,
+                cone_angle: None,
+                cone_softness: None,
+            }
+        }
+    }
+}
+
 /// シーンの変更点の差分情報の一つの要素
 pub enum SceneDiffItem {
     MeshCreated(SdfPath, TransformMatrix, MeshData),
     MeshDestroyed(SdfPath),
     MeshTransformMatrixDirtied(SdfPath, TransformMatrix),
     MeshDataDirtied(SdfPath, MeshData),
+    SphereLightAddOrUpdate(SdfPath, SphereLight),
+    SphereLightDestroyed(SdfPath),
 }
 
 /// シーンの変更点の差分情報全体
@@ -400,6 +348,23 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
                 ),
             ));
         }
+
+        for (path, data) in diff.sphere_lights.update {
+            items.push(SceneDiffItem::SphereLightAddOrUpdate(
+                path,
+                SphereLight::new(
+                    Mat4::from_cols_array(&data.transform_matrix.unwrap()),
+                    data.intensity.unwrap(),
+                    Vec3::from(data.color.unwrap()),
+                    data.cone_angle,
+                    data.cone_softness,
+                ),
+            ));
+        }
+        for path in diff.sphere_lights.destroy {
+            items.push(SceneDiffItem::SphereLightDestroyed(path));
+        }
+
         Self { items }
     }
 }

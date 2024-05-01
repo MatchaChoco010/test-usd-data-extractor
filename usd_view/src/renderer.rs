@@ -1,8 +1,9 @@
+use bytemuck::Zeroable;
 use glam::{Mat4, Vec2, Vec3};
 use std::sync::Arc;
 use wgpu::{CommandEncoder, TextureView};
 
-use crate::render_scene::RenderScene;
+use crate::render_scene::*;
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
@@ -52,53 +53,24 @@ pub struct Model {
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub struct DirectionalLight {
-    pub direction: Vec3,
-    pub intensity: f32,
-    pub color: Vec3,
-    pub angle: f32,
-}
-
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
 pub struct DirectionalLights {
-    pub lights: [DirectionalLight; 4],
+    pub lights: [RenderDirectionalLight; 4],
     pub count: u32,
     pub _padding: [u32; 3],
-}
-
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub struct PointLight {
-    pub position: Vec3,
-    pub intensity: f32,
-    pub color: Vec3,
-    pub _padding: u32,
 }
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct PointLights {
-    pub lights: [PointLight; 16],
+    pub lights: [RenderPointLight; 16],
     pub count: u32,
     pub _padding: [u32; 3],
 }
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub struct SpotLight {
-    pub position: Vec3,
-    pub intensity: f32,
-    pub direction: Vec3,
-    pub angle: f32,
-    pub color: Vec3,
-    pub softness: f32,
-}
-
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
 pub struct SpotLights {
-    pub lights: [SpotLight; 16],
+    pub lights: [RenderSpotLight; 16],
     pub count: u32,
     pub _padding: [u32; 3],
 }
@@ -429,90 +401,64 @@ impl Renderer {
 
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-        // {
-        //     let mut directional_lights = Vec::with_capacity(4);
-        //     for light in scene.distant_lights.values() {
-        //         directional_lights.push(DirectionalLight {
-        //             direction: light.direction,
-        //             intensity: light.intensity,
-        //             color: light.color,
-        //             angle: light.angle,
-        //         });
-        //     }
-        //     let mut lights = [Zeroable::zeroed(); 4];
-        //     for i in 0..4 {
-        //         lights[i] = directional_lights
-        //             .get(i)
-        //             .cloned()
-        //             .unwrap_or(Zeroable::zeroed());
-        //     }
-        //     let directional_lights = DirectionalLights {
-        //         lights,
-        //         count: directional_lights.len().max(4) as u32,
-        //         _padding: [0; 3],
-        //     };
-        //     self.queue.write_buffer(
-        //         &self.directional_lights_buffer,
-        //         0,
-        //         bytemuck::cast_slice(&[directional_lights]),
-        //     );
-        // }
+        let (directional_lights, point_lights, spot_lights) = scene.get_lights();
 
-        // {
-        //     let mut point_lights = Vec::with_capacity(16);
-        //     let mut spot_lights = Vec::with_capacity(16);
-        //     for light in scene.sphere_lights.values() {
-        //         if light.is_spot {
-        //             spot_lights.push(SpotLight {
-        //                 position: light.position,
-        //                 intensity: light.intensity,
-        //                 direction: light.direction.unwrap(),
-        //                 color: light.color,
-        //                 angle: light.cone_angle.unwrap().to_radians(),
-        //                 softness: light.cone_softness.unwrap(),
-        //             });
-        //         } else {
-        //             point_lights.push(PointLight {
-        //                 position: light.position,
-        //                 intensity: light.intensity,
-        //                 color: light.color,
-        //                 _padding: 0,
-        //             });
-        //         }
-        //     }
-        //     {
-        //         let mut lights = [Zeroable::zeroed(); 16];
-        //         for i in 0..16 {
-        //             lights[i] = point_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
-        //         }
-        //         let point_lights = PointLights {
-        //             lights,
-        //             count: point_lights.len().max(16) as u32,
-        //             _padding: [0; 3],
-        //         };
-        //         self.queue.write_buffer(
-        //             &self.point_lights_buffer,
-        //             0,
-        //             bytemuck::cast_slice(&[point_lights]),
-        //         );
-        //     }
-        //     {
-        //         let mut lights = [Zeroable::zeroed(); 16];
-        //         for i in 0..16 {
-        //             lights[i] = spot_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
-        //         }
-        //         let spot_lights = SpotLights {
-        //             lights,
-        //             count: spot_lights.len().max(16) as u32,
-        //             _padding: [0; 3],
-        //         };
-        //         self.queue.write_buffer(
-        //             &self.spot_lights_buffer,
-        //             0,
-        //             bytemuck::cast_slice(&[spot_lights]),
-        //         );
-        //     }
-        // }
+        // update directional_lights
+        {
+            let mut lights = [Zeroable::zeroed(); 4];
+            for i in 0..4 {
+                lights[i] = directional_lights
+                    .get(i)
+                    .cloned()
+                    .unwrap_or(Zeroable::zeroed());
+            }
+            let directional_lights = DirectionalLights {
+                lights,
+                count: directional_lights.len().max(4) as u32,
+                _padding: [0; 3],
+            };
+            self.queue.write_buffer(
+                &self.directional_lights_buffer,
+                0,
+                bytemuck::cast_slice(&[directional_lights]),
+            );
+        }
+
+        // update point lights
+        {
+            let mut lights = [Zeroable::zeroed(); 16];
+            for i in 0..16 {
+                lights[i] = point_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
+            }
+            let point_lights = PointLights {
+                lights,
+                count: point_lights.len().max(16) as u32,
+                _padding: [0; 3],
+            };
+            self.queue.write_buffer(
+                &self.point_lights_buffer,
+                0,
+                bytemuck::cast_slice(&[point_lights]),
+            );
+        }
+
+        // update spot lights
+        {
+            let mut lights = [Zeroable::zeroed(); 16];
+            for i in 0..16 {
+                lights[i] = spot_lights.get(i).cloned().unwrap_or(Zeroable::zeroed());
+            }
+            let spot_lights = SpotLights {
+                lights,
+                count: spot_lights.len().max(16) as u32,
+                _padding: [0; 3],
+            };
+            self.queue.write_buffer(
+                &self.spot_lights_buffer,
+                0,
+                bytemuck::cast_slice(&[spot_lights]),
+            );
+        }
 
         render_pass.set_bind_group(1, &self.lights_bind_group, &[]);
 
