@@ -31,14 +31,12 @@ public:
   MeshObserver();
   virtual ~MeshObserver();
 
-  inline static const TfToken TypeToken = TfToken("mesh");
+  inline static const TfToken MeshTypeToken = TfToken("mesh");
 
   inline static const HdDataSourceLocator TransforLocator =
     HdDataSourceLocator(TfToken("xform"));
   inline static const HdDataSourceLocator PrimvarsLocator =
     HdDataSourceLocator(TfToken("privars"));
-  inline static const HdDataSourceLocator MaterialBindingsLocator =
-    HdDataSourceLocator(TfToken("materialBindings"));
   inline static const HdDataSourceLocator MeshLocator =
     HdDataSourceLocator(TfToken("mesh"));
 
@@ -62,11 +60,13 @@ public:
                         TfToken("interpolation"));
   inline static const HdDataSourceLocator UVsDataLocator =
     HdDataSourceLocator(TfToken("primvars"),
-                        TfToken("uv"),
-                        TfToken("primvarValue"));
+                        TfToken("st"),
+                        TfToken("indexedPrimvarValue"));
+  inline static const HdDataSourceLocator UVsIndicesDataLocator =
+    HdDataSourceLocator(TfToken("primvars"), TfToken("st"), TfToken("indices"));
   inline static const HdDataSourceLocator UVsInterpolationDataLocator =
     HdDataSourceLocator(TfToken("primvars"),
-                        TfToken("uv"),
+                        TfToken("st"),
                         TfToken("interpolation"));
   inline static const HdDataSourceLocator FaceVertexIndicesLocator =
     HdDataSourceLocator(TfToken("mesh"),
@@ -78,6 +78,22 @@ public:
                         TfToken("faceVertexCounts"));
   inline static const HdDataSourceLocator GeomSubsetLocator =
     HdDataSourceLocator(TfToken("mesh"), TfToken("geomSubsets"));
+
+  inline static const HdDataSourceLocator MaterialBindingsLocator =
+    HdDataSourceLocator(TfToken("materialBindings"),
+                        TfToken(""),
+                        TfToken("path"));
+
+  inline static const TfToken GeomSubsetTypeToken = TfToken("geomSubset");
+
+  inline static const HdDataSourceLocator IndicesLocator =
+    HdDataSourceLocator(TfToken("indices"));
+  inline static const HdDataSourceLocator TypeLocator =
+    HdDataSourceLocator(TfToken("type"));
+  inline static const HdDataSourceLocator MaterialBindingsPathLocator =
+    HdDataSourceLocator(TfToken("materialBindings"),
+                        TfToken(""),
+                        TfToken("path"));
 
   void PrimsAdded(const HdSceneIndexBase& sender,
                   const HdSceneIndexObserver::AddedPrimEntries& entries);
@@ -98,6 +114,8 @@ public:
 private:
   // stageに存在するMeshのPathを記録する
   std::set<SdfPath> _meshPaths;
+  // stageに存在するGeomSubsetのPathを記録する
+  std::set<SdfPath> _geomSubsetPaths;
 
   // 前回GetDiffしてClearしてから追加されたMeshの差分のPathを記録する
   std::set<SdfPath> _added;

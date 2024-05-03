@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    "Exported from Adobe Substance 3D Painter 9.1.2"
+    defaultPrim = "RootNode"
+    subLayers = [
+        @./PBR - Metallic Roughness Alpha-test.material.usda@
+    ]
+)
+
+def "RootNode" (
+    prepend references = @./PBR - Metallic Roughness Alpha-test.geo.usd@
+)
+{
+}
+

@@ -10,6 +10,7 @@ egui-wgpu = "0.27.2"
 egui-winit = "0.27.2"
 env_logger = "0.11.3"
 glam = { version = "0.27.0", features = ["bytemuck"] }
+image = "0.25.1"
 pollster = "0.3.0"
 usd_data_extractor = { path = "../usd_data_extractor" }
 wgpu = "0.19.4"

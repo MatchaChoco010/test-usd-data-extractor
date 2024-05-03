@@ -38,6 +38,23 @@ impl Vertex {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct Material {
+    pub base_color: Vec3,
+    pub metallic: f32,
+    pub emissive: Vec3,
+    pub roughness: f32,
+    pub opacity: f32,
+    pub base_color_texture: u32,
+    pub metallic_texture: u32,
+    pub emissive_texture: u32,
+    pub roughness_texture: u32,
+    pub normal_texture: u32,
+    pub opacity_texture: u32,
+    pub _padding: u32,
+}
+
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct Camera {
@@ -47,8 +64,31 @@ pub struct Camera {
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub struct Model {
-    pub model: glam::Mat4,
+pub struct RenderDirectionalLight {
+    pub direction: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub _padding: u32,
+}
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct RenderPointLight {
+    pub position: Vec3,
+    pub intensity: f32,
+    pub color: Vec3,
+    pub _padding: u32,
+}
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct RenderSpotLight {
+    pub position: Vec3,
+    pub intensity: f32,
+    pub direction: Vec3,
+    pub angle: f32,
+    pub color: Vec3,
+    pub softness: f32,
 }
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -138,6 +178,8 @@ pub struct Renderer {
     lights_bind_group: wgpu::BindGroup,
     transform_matrix_bind_group_layout: wgpu::BindGroupLayout,
     transform_matrix_bind_groups: Vec<wgpu::BindGroup>,
+    material_bind_group_layout: wgpu::BindGroupLayout,
+    material_bind_groups: Vec<wgpu::BindGroup>,
     depth_texture: Texture,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -266,7 +308,40 @@ impl Renderer {
                     },
                     count: None,
                 }],
-                label: Some("model_bind_group_layout"),
+                label: Some("transform_bind_group_layout"),
+            });
+
+        let material_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("material_bind_group_layout"),
             });
 
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
@@ -278,6 +353,7 @@ impl Renderer {
                     &camera_bind_group_layout,
                     &lights_bind_group_layout,
                     &transform_matrix_bind_group_layout,
+                    &material_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -333,6 +409,8 @@ impl Renderer {
             lights_bind_group,
             transform_matrix_bind_group_layout,
             transform_matrix_bind_groups: vec![],
+            material_bind_group_layout,
+            material_bind_groups: vec![],
             depth_texture,
             render_pipeline,
         }
@@ -454,9 +532,10 @@ impl Renderer {
 
         render_pass.set_bind_group(1, &self.lights_bind_group, &[]);
 
-        let meshes = scene.get_render_meshes();
+        let meshes = scene.get_meshes();
 
         self.transform_matrix_bind_groups.clear();
+        self.material_bind_groups.clear();
         for mesh in &meshes {
             let transform_matrix_bind_group =
                 self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -473,12 +552,37 @@ impl Renderer {
                 });
             self.transform_matrix_bind_groups
                 .push(transform_matrix_bind_group);
+
+            let material_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.material_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: mesh.material_buffer,
+                            offset: 0,
+                            size: None,
+                        }),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(mesh.diffuse_texture),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(mesh.diffuse_sampler),
+                    },
+                ],
+                label: Some("material_bind_group"),
+            });
+            self.material_bind_groups.push(material_bind_group);
         }
 
         render_pass.set_pipeline(&self.render_pipeline);
 
         for (i, mesh) in meshes.into_iter().enumerate() {
             render_pass.set_bind_group(2, &self.transform_matrix_bind_groups[i], &[]);
+            render_pass.set_bind_group(3, &self.material_bind_groups[i], &[]);
             render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.draw_indexed(0..mesh.index_count, 0, 0..1);

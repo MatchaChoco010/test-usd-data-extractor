@@ -1,0 +1,128 @@
+#usda 1.0
+(
+    "Exported from Adobe Substance 3D Painter 9.1.2"
+    defaultPrim = "RootNode"
+)
+
+def "RootNode"
+{
+    def Scope "material"
+    {
+        def Material "DefaultMaterial" (
+            customData = {
+                dictionary adobe = {
+                    dictionary painter = {
+                        asset painterProject_spp = @C:/Program Files/Adobe/Adobe Substance 3D Painter/resources/starter_assets/templates/PBR - Metallic Roughness Alpha-test.spt@
+                    }
+                }
+            }
+        )
+        {
+            asset inputs:basecolor_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_BaseColor_sRGB.png@
+            asset inputs:compositedNormalDX_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_Normal_Raw.png@
+            asset inputs:emissive_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_Emissive_sRGB.png@
+            asset inputs:height_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_Height_Raw.png@
+            asset inputs:metallic_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_Metallic_Raw.png@
+            asset inputs:opacity_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_BaseColor_sRGB.png@
+            asset inputs:roughness_tex = @PBR - Metallic Roughness Alpha-test_textures/monkey_DefaultMaterial_Roughness_Raw.png@
+            token outputs:displacement.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/ShaderUsdPreviewSurface.outputs:displacement>
+            token outputs:surface.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/ShaderUsdPreviewSurface.outputs:surface>
+
+            def NodeGraph "UsdPreviewSurface"
+            {
+                def Shader "ShaderUsdPreviewSurface"
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    float3 inputs:diffuseColor.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/diffuseColorTextureShader.outputs:rgb>
+                    float3 inputs:emissive.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/emissiveTextureShader.outputs:rgb>
+                    float inputs:metallic.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/metallicTextureShader.outputs:r>
+                    normal3f inputs:normal.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/normalTextureShader.outputs:rgb>
+                    float inputs:opacity.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/opacityTextureShader.outputs:a>
+                    float inputs:roughness.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/roughnessTextureShader.outputs:r>
+                    token outputs:displacement
+                    token outputs:surface
+                }
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname = "st"
+                    float2 outputs:result
+                }
+
+                def Shader "diffuseColorTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:basecolor_tex>
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    float3 outputs:rgb
+                }
+
+                def Shader "roughnessTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:roughness_tex>
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    float outputs:r
+                }
+
+                def Shader "metallicTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:metallic_tex>
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    float outputs:r
+                }
+
+                def Shader "emissiveTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:emissive_tex>
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    float3 outputs:rgb
+                }
+
+                def Shader "opacityTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:opacity_tex>
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    float outputs:a
+                }
+
+                def Shader "normalTextureShader"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    float4 inputs:bias = (-1, 1, -1, 0)
+                    asset inputs:file.connect = </RootNode/material/DefaultMaterial.inputs:compositedNormalDX_tex>
+                    float4 inputs:scale = (2, -2, 2, 1)
+                    float2 inputs:st.connect = </RootNode/material/DefaultMaterial/UsdPreviewSurface/TexCoordReader.outputs:result>
+                    token inputs:wrapS = "repeat"
+                    token inputs:wrapT = "repeat"
+                    normal3f outputs:rgb
+                }
+            }
+        }
+    }
+}
+
+over "Suzanne"
+{
+    over "Suzanne" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </RootNode/material/DefaultMaterial>
+    }
+}
+

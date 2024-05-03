@@ -17,6 +17,7 @@ HdBridgeSceneIndexObserver::PrimsAdded(const HdSceneIndexBase& sender,
   _sphereLightObserver.PrimsAdded(sender, entries);
   _distantLightObserver.PrimsAdded(sender, entries);
   _cameraObserver.PrimsAdded(sender, entries);
+  _materialObserver.PrimsAdded(sender, entries);
 }
 
 void
@@ -28,6 +29,7 @@ HdBridgeSceneIndexObserver::PrimsRemoved(const HdSceneIndexBase& sender,
   _sphereLightObserver.PrimsRemoved(sender, entries);
   _distantLightObserver.PrimsRemoved(sender, entries);
   _cameraObserver.PrimsRemoved(sender, entries);
+  _materialObserver.PrimsRemoved(sender, entries);
 }
 
 void
@@ -39,6 +41,7 @@ HdBridgeSceneIndexObserver::PrimsDirtied(const HdSceneIndexBase& sender,
   _sphereLightObserver.PrimsDirtied(sender, entries);
   _distantLightObserver.PrimsDirtied(sender, entries);
   _cameraObserver.PrimsDirtied(sender, entries);
+  _materialObserver.PrimsDirtied(sender, entries);
 }
 
 void
@@ -50,6 +53,7 @@ HdBridgeSceneIndexObserver::PrimsRenamed(const HdSceneIndexBase& sender,
   _sphereLightObserver.PrimsRenamed(sender, entries);
   _distantLightObserver.PrimsRenamed(sender, entries);
   _cameraObserver.PrimsRenamed(sender, entries);
+  _materialObserver.PrimsRenamed(sender, entries);
 }
 
 void
@@ -60,6 +64,7 @@ HdBridgeSceneIndexObserver::ClearDiff()
   _sphereLightObserver.ClearDiff();
   _distantLightObserver.ClearDiff();
   _cameraObserver.ClearDiff();
+  _materialObserver.ClearDiff();
 }
 
 void
@@ -71,4 +76,5 @@ HdBridgeSceneIndexObserver::GetDiff(const HdSceneIndexBase& sender,
   _sphereLightObserver.GetDiff(sender, diff);
   _distantLightObserver.GetDiff(sender, diff);
   _cameraObserver.GetDiff(sender, diff);
+  _materialObserver.GetDiff(sender, diff);
 }

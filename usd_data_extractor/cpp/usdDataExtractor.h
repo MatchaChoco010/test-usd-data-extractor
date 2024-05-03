@@ -2,6 +2,7 @@
 #define BRIDGE_USD_DATA_EXTRACTOR_H
 
 #include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hd/utils.h"
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/stage.h"

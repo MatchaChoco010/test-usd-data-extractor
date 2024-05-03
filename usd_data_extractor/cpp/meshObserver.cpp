@@ -12,26 +12,37 @@ MeshObserver::PrimsAdded(const HdSceneIndexBase& sender,
   for (const auto entry : entries) {
     auto primType = entry.primType;
 
-    if (primType != TypeToken) {
+    if (primType != MeshTypeToken && primType != GeomSubsetTypeToken) {
       continue;
     }
 
-    // stageに追加されたMeshを記録する
-    _meshPaths.insert(entry.primPath);
+    if (primType == MeshTypeToken) {
+      // stageに追加されたMeshを記録する
+      _meshPaths.insert(entry.primPath);
+    } else if (primType == GeomSubsetTypeToken) {
+      // stageに追加されたGeomSubsetを記録する
+      _geomSubsetPaths.insert(entry.primPath);
+    }
 
-    if (_removed.find(entry.primPath) != _removed.end()) {
+    // geomSubsetの場合もmeshのprimPathをdiffとして記録する
+    auto primPath = entry.primPath;
+    if (primType == GeomSubsetTypeToken) {
+      primPath = primPath.GetParentPath();
+    }
+
+    if (_removed.find(primPath) != _removed.end()) {
       // このDiff中ですでにremovedされているDiffがある場合、
       // removedを取り消してaddedとして扱う
-      _removed.erase(entry.primPath);
-      _added.emplace(entry.primPath);
-    } else if (_dirtied.find(entry.primPath) != _dirtied.end()) {
+      _removed.erase(primPath);
+      _added.emplace(primPath);
+    } else if (_dirtied.find(primPath) != _dirtied.end()) {
       // このDiff中ですでにdirtiedされているDiffがある場合、
       // dirtiedを取り消してaddedとして扱う
-      _dirtied.erase(entry.primPath);
-      _added.emplace(entry.primPath);
+      _dirtied.erase(primPath);
+      _added.emplace(primPath);
     } else {
       // _addedされたMeshとしてdiffに登録する
-      _added.emplace(entry.primPath);
+      _added.emplace(primPath);
     }
   }
 }
@@ -42,26 +53,43 @@ MeshObserver::PrimsRemoved(
   const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
   for (const auto entry : entries) {
-    // meshPathに記録されていない場合は無視する
-    if (_meshPaths.find(entry.primPath) == _meshPaths.end()) {
+    // meshPathかgeomPathに記録されていない場合は無視する
+    auto isMesh = _meshPaths.find(entry.primPath) != _meshPaths.end();
+    auto isGeomSubset =
+      _geomSubsetPaths.find(entry.primPath) != _geomSubsetPaths.end();
+    if (!isMesh && !isGeomSubset) {
       continue;
     }
 
-    // stageから削除されたMeshを記録から削除する
-    _meshPaths.erase(entry.primPath);
+    if (isMesh) {
+      // stageから削除されたMeshを記録から削除する
+      _meshPaths.erase(entry.primPath);
+    } else if (isGeomSubset) {
+      // stageから削除されたGeomSubsetを記録から削除する
+      _geomSubsetPaths.erase(entry.primPath);
+    }
 
-    if (_added.find(entry.primPath) != _added.end()) {
-      // このDiff中ですでにaddedされているDiffがある場合、
-      // addedを取り消して差分はなかったことにする
-      _added.erase(entry.primPath);
-    } else if (_dirtied.find(entry.primPath) != _dirtied.end()) {
-      // このDiff中ですでにdirtiedされているDiffがある場合、
-      // そのdirtiedは削除されるので取り消してremovedだけを記録する
-      _dirtied.erase(entry.primPath);
-      _removed.emplace(entry.primPath);
-    } else {
-      // _removedされたMeshとしてdiffに登録する
-      _removed.emplace(entry.primPath);
+    // meshのprimの差分を記録する
+    if (isMesh) {
+      // geomSubsetの場合もmeshのprimPathをdiffとして記録する
+      auto primPath = entry.primPath;
+      if (isGeomSubset) {
+        primPath = primPath.GetParentPath();
+      }
+
+      if (_added.find(primPath) != _added.end()) {
+        // このDiff中ですでにaddedされているDiffがある場合、
+        // addedを取り消して差分はなかったことにする
+        _added.erase(primPath);
+      } else if (_dirtied.find(primPath) != _dirtied.end()) {
+        // このDiff中ですでにdirtiedされているDiffがある場合、
+        // そのdirtiedは削除されるので取り消してremovedだけを記録する
+        _dirtied.erase(primPath);
+        _removed.emplace(primPath);
+      } else {
+        // _removedされたMeshとしてdiffに登録する
+        _removed.emplace(primPath);
+      }
     }
   }
 }
@@ -72,28 +100,51 @@ MeshObserver::PrimsDirtied(
   const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
   for (const auto entry : entries) {
-    // meshPathに記録されていない場合は無視する
-    if (_meshPaths.find(entry.primPath) == _meshPaths.end()) {
+    // meshPathかgeomPathに記録されていない場合は無視する
+    auto isMesh = _meshPaths.find(entry.primPath) != _meshPaths.end();
+    auto isGeomSubset =
+      _geomSubsetPaths.find(entry.primPath) != _geomSubsetPaths.end();
+    if (!isMesh && !isGeomSubset) {
       continue;
+    }
+
+    // geomSubsetの場合もmeshのprimPathをdiffとして記録する
+    auto primPath = entry.primPath;
+    if (isGeomSubset) {
+      primPath = primPath.GetParentPath();
     }
 
     // このフレーム中でaddedな場合は、addedですべての情報を送るので追加で差分を送る必要はない
     // そのため、addedされたMeshの場合はdirtiedを無視する
-    if (_added.find(entry.primPath) != _added.end()) {
+    if (_added.find(primPath) != _added.end()) {
       continue;
     }
 
-    // dirtiedされたMeshのlocatorによって、どのDiffを登録するかを決定する
-    for (const auto locator : entry.dirtyLocators) {
-      if (locator.HasPrefix(TransforLocator)) {
-        // xformについて差分がある場合、transformのmatrixを再取得する
-        _dirtied[entry.primPath].insert(DiffType::TransformMatrix);
-      } else if (locator.HasPrefix(PrimvarsLocator) ||
-                 locator.HasPrefix(MaterialBindingsLocator) ||
-                 locator.HasPrefix(MeshLocator)) {
-        // primvars, materialBindings, meshのいずれかについて差分がある場合、
-        // meshの全データを再取得する
-        _dirtied[entry.primPath].insert(DiffType::MeshData);
+    // meshのprimの差分を記録する
+    if (isMesh) {
+      // dirtiedされたMeshのlocatorによって、どのDiffを登録するかを決定する
+      for (const auto locator : entry.dirtyLocators) {
+        if (locator.HasPrefix(TransforLocator)) {
+          // xformについて差分がある場合、transformのmatrixを再取得する
+          _dirtied[primPath].insert(DiffType::TransformMatrix);
+        } else if (locator.HasPrefix(PrimvarsLocator) ||
+                   locator.HasPrefix(MaterialBindingsLocator) ||
+                   locator.HasPrefix(MeshLocator)) {
+          // primvars, materialBindings, meshのいずれかについて差分がある場合、
+          // meshの全データを再取得する
+          _dirtied[primPath].insert(DiffType::MeshData);
+        }
+      }
+    } else if (isGeomSubset) {
+      for (const auto locator : entry.dirtyLocators) {
+        if (locator.HasPrefix(IndicesLocator) ||
+            locator.HasPrefix(TypeLocator) ||
+            locator.HasPrefix(MaterialBindingsPathLocator)) {
+          // indices, type,
+          // materialBindingsPathのいずれかについて差分がある場合、
+          // meshの全データを再取得する
+          _dirtied[primPath].insert(DiffType::MeshData);
+        }
       }
     }
   }
@@ -105,47 +156,69 @@ MeshObserver::PrimsRenamed(
   const HdSceneIndexObserver::RenamedPrimEntries& entries)
 {
   for (const auto entry : entries) {
-    // meshPathに記録されていない場合は無視する
-    if (_meshPaths.find(entry.oldPrimPath) == _meshPaths.end()) {
+    // meshPathかgeomPathに記録されていない場合は無視する
+    auto isMesh = _meshPaths.find(entry.newPrimPath) != _meshPaths.end();
+    auto isGeomSubset =
+      _geomSubsetPaths.find(entry.newPrimPath) != _geomSubsetPaths.end();
+    if (!isMesh && !isGeomSubset) {
       continue;
     }
 
-    // stageからrenameされたMeshを記録から削除し、新しい名前で記録する
-    _meshPaths.erase(entry.oldPrimPath);
-    _meshPaths.insert(entry.newPrimPath);
-
-    // oldPathをremoveする
-    {
-      if (_added.find(entry.oldPrimPath) != _added.end()) {
-        // このDiff中ですでにaddedされているDiffがある場合、
-        // addedを取り消して差分はなかったことにする
-        _added.erase(entry.oldPrimPath);
-      } else if (_dirtied.find(entry.oldPrimPath) != _dirtied.end()) {
-        // このDiff中ですでにdirtiedされているDiffがある場合、
-        // そのdirtiedは削除されるので取り消す
-        _dirtied.erase(entry.oldPrimPath);
-        _removed.emplace(entry.oldPrimPath);
-      } else {
-        // _removedされたMeshとしてdiffに登録する
-        _removed.emplace(entry.oldPrimPath);
-      }
+    if (isMesh) {
+      // stageからrenameされたMeshを記録から削除し、新しい名前で記録する
+      _meshPaths.erase(entry.oldPrimPath);
+      _meshPaths.insert(entry.newPrimPath);
+    } else if (isGeomSubset) {
+      // stageからrenameされたGeomSubsetを記録から削除し、新しい名前で記録する
+      _geomSubsetPaths.erase(entry.oldPrimPath);
+      _geomSubsetPaths.insert(entry.newPrimPath);
     }
 
-    // newPathをaddする
-    {
-      if (_removed.find(entry.newPrimPath) != _removed.end()) {
-        // このDiff中ですでにremovedされているDiffがある場合、
-        // removedを取り消してaddedとして扱う
-        _removed.erase(entry.newPrimPath);
-        _added.emplace(entry.newPrimPath);
-      } else if (_dirtied.find(entry.newPrimPath) != _dirtied.end()) {
-        // このDiff中ですでにdirtiedされているDiffがある場合、
-        // dirtiedを取り消してaddedとして扱う
-        _dirtied.erase(entry.newPrimPath);
-        _added.emplace(entry.newPrimPath);
-      } else {
-        // _addedされたMeshとしてdiffに登録する
-        _added.emplace(entry.newPrimPath);
+    // meshのprimの差分を記録する
+    if (isMesh) {
+      // geomSubsetの場合もmeshのprimPathをdiffとして記録する
+      auto oldPrimPath = entry.oldPrimPath;
+      if (isGeomSubset) {
+        oldPrimPath = oldPrimPath.GetParentPath();
+      }
+      auto newPrimPath = entry.newPrimPath;
+      if (isGeomSubset) {
+        newPrimPath = newPrimPath.GetParentPath();
+      }
+
+      // oldPathをremoveする
+      {
+        if (_added.find(oldPrimPath) != _added.end()) {
+          // このDiff中ですでにaddedされているDiffがある場合、
+          // addedを取り消して差分はなかったことにする
+          _added.erase(oldPrimPath);
+        } else if (_dirtied.find(oldPrimPath) != _dirtied.end()) {
+          // このDiff中ですでにdirtiedされているDiffがある場合、
+          // そのdirtiedは削除されるので取り消す
+          _dirtied.erase(oldPrimPath);
+          _removed.emplace(oldPrimPath);
+        } else {
+          // _removedされたMeshとしてdiffに登録する
+          _removed.emplace(oldPrimPath);
+        }
+      }
+
+      // newPathをaddする
+      {
+        if (_removed.find(newPrimPath) != _removed.end()) {
+          // このDiff中ですでにremovedされているDiffがある場合、
+          // removedを取り消してaddedとして扱う
+          _removed.erase(newPrimPath);
+          _added.emplace(newPrimPath);
+        } else if (_dirtied.find(newPrimPath) != _dirtied.end()) {
+          // このDiff中ですでにdirtiedされているDiffがある場合、
+          // dirtiedを取り消してaddedとして扱う
+          _dirtied.erase(newPrimPath);
+          _added.emplace(newPrimPath);
+        } else {
+          // _addedされたMeshとしてdiffに登録する
+          _added.emplace(newPrimPath);
+        }
       }
     }
   }
@@ -258,6 +331,23 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
       diff.create_mesh_uvs(pathString, uvsData);
     }
 
+    auto uvsIndicesSource =
+      sceneIndex.GetDataSource(path, UVsIndicesDataLocator);
+    if (uvsIndicesSource) {
+      auto sampledUVsIndicesSource =
+        HdSampledDataSource::Cast(uvsIndicesSource);
+      auto value = sampledUVsIndicesSource->GetValue(0);
+      auto uvsIndices = value.Get<VtIntArray>();
+      auto size = uvsIndices.size();
+      std::vector<uint32_t> data;
+      data.reserve(size);
+      for (int i = 0; i < size; i++) {
+        data.push_back(uvsIndices[i]);
+      }
+      auto uvsIndicesData = rust::Slice<const uint32_t>(data.data(), size);
+      diff.create_mesh_uvs_indices(pathString, uvsIndicesData);
+    }
+
     auto uvsInterpolationSource =
       sceneIndex.GetDataSource(path, UVsInterpolationDataLocator);
     if (uvsInterpolationSource) {
@@ -317,38 +407,56 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
       diff.create_mesh_face_vertex_counts(pathString, faceVertexCountsData);
     }
 
-    auto geomSubsetSource = sceneIndex.GetDataSource(path, GeomSubsetLocator);
-    if (geomSubsetSource) {
-      auto containerGeomSubsetSource =
-        HdContainerDataSource::Cast(geomSubsetSource);
+    // meshに関係するgeomSubsetの情報をdiffに登録する
+    for (const auto& geomSubsetPath : _geomSubsetPaths) {
+      if (geomSubsetPath.GetParentPath() == path) {
+        auto name = geomSubsetPath.GetName();
+        auto nameString = rust::String(name);
 
-      for (const auto& name : containerGeomSubsetSource->GetNames()) {
-        auto typeLocator = HdDataSourceLocator(
-          TfToken("mesh"), TfToken("geomSubsets"), name, TfToken("type"));
-        auto typeSource = sceneIndex.GetDataSource(path, typeLocator);
-        auto sampledTypeSource = HdSampledDataSource::Cast(typeSource);
-        auto typeValue = sampledTypeSource->GetValue(0);
-        auto typeData = typeValue.Get<TfToken>();
-        auto ty = rust::String(typeData.GetString());
-
-        auto indicesLocator = HdDataSourceLocator(
-          TfToken("mesh"), TfToken("geomSubsets"), name, TfToken("indices"));
-        auto indicesSource = sceneIndex.GetDataSource(path, indicesLocator);
-        auto sampledIndicesSource = HdSampledDataSource::Cast(indicesSource);
-        auto indicesValue = sampledIndicesSource->GetValue(0);
-        auto indicesData = indicesValue.Get<VtIntArray>();
-        auto size = indicesData.size();
+        auto indicesSource =
+          sceneIndex.GetDataSource(geomSubsetPath, IndicesLocator);
+        auto sampledIndices = HdSampledDataSource::Cast(indicesSource);
+        auto value = sampledIndices->GetValue(0);
+        auto indices = value.Get<VtIntArray>();
+        auto size = indices.size();
         std::vector<uint32_t> data;
         data.reserve(size);
         for (int i = 0; i < size; i++) {
-          data.push_back(indicesData[i]);
+          data.push_back(indices[i]);
         }
-        auto indices = rust::Slice<const uint32_t>(data.data(), size);
+        auto indicesData = rust::Slice<const uint32_t>(data.data(), size);
 
-        auto nameString = rust::String(name.GetString());
+        auto typeSource = sceneIndex.GetDataSource(geomSubsetPath, TypeLocator);
+        auto sampledType = HdSampledDataSource::Cast(typeSource);
+        auto typeValue = sampledType->GetValue(0);
+        auto type = typeValue.Get<TfToken>();
+        auto ty = rust::String(type.GetText());
 
-        diff.create_mesh_geom_subset(pathString, nameString, ty, indices);
+        diff.create_mesh_geom_subset(pathString, nameString, ty, indicesData);
+
+        auto materialPathSource =
+          sceneIndex.GetDataSource(geomSubsetPath, MaterialBindingsPathLocator);
+        if (materialPathSource) {
+          auto sampledMaterialPathSource =
+            HdSampledDataSource::Cast(materialPathSource);
+          auto value = sampledMaterialPathSource->GetValue(0);
+          auto materialPath = value.Get<SdfPath>();
+          auto materialPathString = rust::String(materialPath.GetText());
+          diff.create_mesh_geom_subset_material_binding(
+            pathString, nameString, materialPathString);
+        }
       }
+    }
+
+    auto materialBindingsSource =
+      sceneIndex.GetDataSource(path, MaterialBindingsLocator);
+    if (materialBindingsSource) {
+      auto sampledMaterialBindingsSource =
+        HdSampledDataSource::Cast(materialBindingsSource);
+      auto value = sampledMaterialBindingsSource->GetValue(0);
+      auto materialPath = value.Get<SdfPath>();
+      auto materialPathString = rust::String(materialPath.GetText());
+      diff.create_mesh_material_binding(pathString, materialPathString);
     }
   }
 
@@ -461,6 +569,23 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
           diff.diff_mesh_data_uvs(pathString, uvsData);
         }
 
+        auto uvsIndicesSource =
+          sceneIndex.GetDataSource(path, UVsIndicesDataLocator);
+        if (uvsIndicesSource) {
+          auto sampledUVsIndicesSource =
+            HdSampledDataSource::Cast(uvsIndicesSource);
+          auto value = sampledUVsIndicesSource->GetValue(0);
+          auto uvsIndices = value.Get<VtIntArray>();
+          auto size = uvsIndices.size();
+          std::vector<uint32_t> data;
+          data.reserve(size);
+          for (int i = 0; i < size; i++) {
+            data.push_back(uvsIndices[i]);
+          }
+          auto uvsIndicesData = rust::Slice<const uint32_t>(data.data(), size);
+          diff.diff_mesh_data_uvs_indices(pathString, uvsIndicesData);
+        }
+
         auto uvsInterpolationSource =
           sceneIndex.GetDataSource(path, UVsInterpolationDataLocator);
         if (uvsInterpolationSource) {
@@ -527,43 +652,58 @@ MeshObserver::GetDiff(const HdSceneIndexBase& sceneIndex, UsdDataDiff& diff)
                                                  faceVertexCountsData);
         }
 
-        auto geomSubsetSource =
-          sceneIndex.GetDataSource(path, GeomSubsetLocator);
-        if (geomSubsetSource) {
-          auto containerGeomSubsetSource =
-            HdContainerDataSource::Cast(geomSubsetSource);
-
-          for (const auto& name : containerGeomSubsetSource->GetNames()) {
-            auto typeLocator = HdDataSourceLocator(
-              TfToken("mesh"), TfToken("geomSubsets"), name, TfToken("type"));
-            auto typeSource = sceneIndex.GetDataSource(path, typeLocator);
-            auto sampledTypeSource = HdSampledDataSource::Cast(typeSource);
-            auto typeValue = sampledTypeSource->GetValue(0);
-            auto typeData = typeValue.Get<TfToken>();
-            auto ty = rust::String(typeData.GetString());
-
-            auto indicesLocator = HdDataSourceLocator(TfToken("mesh"),
-                                                      TfToken("geomSubsets"),
-                                                      name,
-                                                      TfToken("indices"));
-            auto indicesSource = sceneIndex.GetDataSource(path, indicesLocator);
-            auto sampledIndicesSource =
-              HdSampledDataSource::Cast(indicesSource);
-            auto indicesValue = sampledIndicesSource->GetValue(0);
-            auto indicesData = indicesValue.Get<VtIntArray>();
-            auto size = indicesData.size();
+        // meshに関係するgeomSubsetの情報をdiffに登録する
+        for (const auto& geomSubsetPath : _geomSubsetPaths) {
+          if (geomSubsetPath.GetParentPath() == path) {
+            auto indicesSource =
+              sceneIndex.GetDataSource(geomSubsetPath, IndicesLocator);
+            auto sampledIndices = HdSampledDataSource::Cast(indicesSource);
+            auto value = sampledIndices->GetValue(0);
+            auto indices = value.Get<VtIntArray>();
+            auto size = indices.size();
             std::vector<uint32_t> data;
             data.reserve(size);
             for (int i = 0; i < size; i++) {
-              data.push_back(indicesData[i]);
+              data.push_back(indices[i]);
             }
-            auto indices = rust::Slice<const uint32_t>(data.data(), size);
+            auto indicesData = rust::Slice<const uint32_t>(data.data(), size);
 
-            auto nameString = rust::String(name.GetString());
+            auto typeSource =
+              sceneIndex.GetDataSource(geomSubsetPath, TypeLocator);
+            auto sampledType = HdSampledDataSource::Cast(typeSource);
+            auto typeValue = sampledType->GetValue(0);
+            auto type = typeValue.Get<TfToken>();
+            auto ty = rust::String(type.GetText());
+
+            auto name = geomSubsetPath.GetName();
+            auto nameString = rust::String(name);
 
             diff.diff_mesh_data_geom_subset(
-              pathString, nameString, ty, indices);
+              pathString, nameString, ty, indicesData);
+
+            auto materialPathSource = sceneIndex.GetDataSource(
+              geomSubsetPath, MaterialBindingsPathLocator);
+            if (materialPathSource) {
+              auto sampledMaterialPathSource =
+                HdSampledDataSource::Cast(materialPathSource);
+              auto value = sampledMaterialPathSource->GetValue(0);
+              auto materialPath = value.Get<SdfPath>();
+              auto materialPathString = rust::String(materialPath.GetText());
+              diff.diff_mesh_data_geom_subset_material_binding(
+                pathString, nameString, materialPathString);
+            }
           }
+        }
+
+        auto materialBindingsSource =
+          sceneIndex.GetDataSource(path, MaterialBindingsLocator);
+        if (materialBindingsSource) {
+          auto sampledMaterialBindingsSource =
+            HdSampledDataSource::Cast(materialBindingsSource);
+          auto value = sampledMaterialBindingsSource->GetValue(0);
+          auto materialPath = value.Get<SdfPath>();
+          auto materialPathString = rust::String(materialPath.GetText());
+          diff.diff_mesh_material_binding(pathString, materialPathString);
         }
       }
     }

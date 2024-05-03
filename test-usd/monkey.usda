@@ -1,0 +1,17 @@
+#usda 1.0
+(
+    defaultPrim = "SphereA"
+    framesPerSecond = 24
+    metersPerUnit = 1
+    timeCodesPerSecond = 24
+    upAxis = "Y"
+)
+
+def "Monkey" (
+    prepend references = @./monkey/PBR - Metallic Roughness Alpha-test.usd@
+)
+{
+    matrix4d xformOp:transform:transform3 = ( (0.01, 0, 0, 0), (0, 0.01, 0, 0), (0, 0, 0.01, 0), (0.028999999999999998, 0.01699999999999955, 2.769651528069443e-9, 1) )
+    uniform token[] xformOpOrder = ["xformOp:transform", "xformOp:transform:transform3"]
+}
+

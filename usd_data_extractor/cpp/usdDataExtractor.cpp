@@ -38,6 +38,9 @@ BridgeUsdDataExtractor::extract(double timeCode, UsdDataDiff& diff)
     _observer.ClearDiff();
   }
 
+  // debug
+  // HdUtils::PrintSceneIndex(std::cout, _sceneIndex);
+
   _stageSceneIndex->SetTime(timeCode);
   _observer.GetDiff(*_sceneIndex, diff);
 

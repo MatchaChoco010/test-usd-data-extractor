@@ -3,55 +3,29 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn main() {
-    let mut vcvars = vcvars::Vcvars::new();
-    let vcvars_include = vcvars.get_cached("INCLUDE").unwrap();
+fn build_windows(manifest_dir: &str, usd_dir: &str, usd_dst: &str, target_dir: PathBuf) {
+    // get python path
+    let python = which::which("python").unwrap();
+    let python = python.to_str().unwrap();
 
-    let mut vcvars = vcvars::Vcvars::new();
-    let vcvars_lib = vcvars.get_cached("LIB").unwrap();
-
-    let mut vcvars = vcvars::Vcvars::new();
-    let vcvars_libpath = vcvars.get_cached("LIBPATH").unwrap();
-
-    let mut vcvars = vcvars::Vcvars::new();
-    let vcvars_path = vcvars.get_cached("PATH").unwrap();
-
-    let mut vcvars = vcvars::Vcvars::new();
-    let visual_studio_version = vcvars.get_cached("VisualStudioVersion").unwrap();
-
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let usd_dir = PathBuf::from(&manifest_dir)
-        .parent()
-        .unwrap()
-        .join("OpenUSD");
-    let target_dir = PathBuf::from(&manifest_dir)
-        .parent()
-        .unwrap()
-        .join("target");
-    let usd_dir = usd_dir.to_str().unwrap();
-    let usd_dst = PathBuf::from(&target_dir).join("OpenUSD");
-
-    let pxr_lib_prefix = env::var("PXR_LIB_PREFIX").unwrap_or("usd".to_string());
-
+    // build OpenUSD
     let output = Command::new("cmd")
-        .env("INCLUDE", &*vcvars_include)
-        .env("LIB", &*vcvars_lib)
-        .env("LIBPATH", &*vcvars_libpath)
-        .env("PATH", &*vcvars_path)
-        .env("VisualStudioVersion", &*visual_studio_version)
         .env("PYTHONUTF8", "1")
+        .arg("/c")
         .args([
-            "/c",
-            "python",
-            &format!("{usd_dir}/build_scripts/build_usd.py"),
+            r#"cd /d C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools"#,
+            "&&",
+            "VsDevCmd.bat",
+            "-arch=x64",
+            "-host_arch=x64",
+            "&&",
+            python,
+            &format!(r#"{usd_dir}\build_scripts\build_usd.py"#),
             "--no-python",
-            usd_dst.to_str().unwrap(),
-            "--build-args",
-            &format!("USD,\"-DPXR_LIB_PREFIX={pxr_lib_prefix}\""),
+            usd_dst,
         ])
         .output()
         .expect("failed to execute build process");
-
     if !output.status.success() {
         println!("status: {}", output.status);
         println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
@@ -70,6 +44,10 @@ fn main() {
         }
     }
 
+    // build CXX bridge
+    let usd_dst = PathBuf::from(usd_dst);
+    let mut vcvars = vcvars::Vcvars::new();
+    let vcvars_include = vcvars.get_cached("INCLUDE").unwrap();
     cxx_build::bridge("src/bridge.rs")
         .cpp(true)
         .debug(false)
@@ -132,5 +110,26 @@ fn main() {
             }
             fs::copy(&path, profile_dir.join(relative_path)).unwrap();
         }
+    }
+}
+
+fn main() {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let usd_dir = PathBuf::from(&manifest_dir)
+        .parent()
+        .unwrap()
+        .join("OpenUSD");
+    let target_dir = PathBuf::from(&manifest_dir)
+        .parent()
+        .unwrap()
+        .join("target");
+    let usd_dir = usd_dir.to_str().unwrap();
+    let usd_dst = PathBuf::from(&target_dir).join("OpenUSD");
+    let usd_dst_str = usd_dst.to_str().unwrap();
+
+    if cfg!(target_os = "windows") {
+        build_windows(&manifest_dir, &usd_dir, &usd_dst_str, target_dir);
+    } else {
+        panic!("Unsupported platform");
     }
 }

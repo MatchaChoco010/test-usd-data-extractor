@@ -48,12 +48,35 @@ struct SpotLightsUniform {
 @group(1) @binding(2)
 var<uniform> spot_lights: SpotLightsUniform;
 
-struct ModelUniform {
+struct TransformMatrixUniform {
     model: mat4x4<f32>,
 };
 
 @group(2) @binding(0)
-var<uniform> model: ModelUniform;
+var<uniform> model: TransformMatrixUniform;
+
+struct Material {
+    base_color: vec3<f32>,
+    metallic: f32,
+    emissive: vec3<f32>,
+    roughness: f32,
+    opacity: f32,
+    base_color_texture: u32,
+    metallic_texture: u32,
+    emissive_texture: u32,
+    roughness_texture: u32,
+    normal_texture: u32,
+    opacity_texture: u32,
+}
+
+@group(3) @binding(0)
+var<uniform> material: Material;
+
+@group(3) @binding(1)
+var t_diffuse: texture_2d<f32>;
+
+@group(3) @binding(2)
+var s_diffuse: sampler;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -65,6 +88,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) view_position: vec3<f32>,
     @location(1) view_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 };
 
 fn inverse(m: mat3x3<f32>) -> mat3x3<f32> {
@@ -109,13 +133,18 @@ fn vs_main(
     out.clip_position = camera.projection * pos;
     out.view_position = pos.xyz / pos.w;
     out.view_normal = model_to_view_normal(vin.normal);
+    out.uv = vin.uv;
     return out;
 }
 
 @fragment
 fn fs_main(fin: VertexOutput) -> @location(0) vec4<f32> {
-    let mesh_color = vec3<f32>(0.5);
     let exposure = 0.25;
+
+    var mesh_color: vec3<f32> = material.base_color;
+    if (material.base_color_texture != 0) {
+        mesh_color *= textureSample(t_diffuse, s_diffuse, fin.uv).xyz;
+    }
 
     var color = vec3<f32>(0.0);
 

@@ -23,6 +23,7 @@ pub mod ffi {
         fn create_mesh_normals(&mut self, path: String, data: &[f32]);
         fn create_mesh_normals_interpolation(&mut self, path: String, interpolation: Interpolation);
         fn create_mesh_uvs(&mut self, path: String, data: &[f32]);
+        fn create_mesh_uvs_indices(&mut self, path: String, data: &[u32]);
         fn create_mesh_uvs_interpolation(&mut self, path: String, interpolation: Interpolation);
         fn create_mesh_face_vertex_indices(&mut self, path: String, data: &[u32]);
         fn create_mesh_face_vertex_counts(&mut self, path: String, data: &[u32]);
@@ -33,6 +34,13 @@ pub mod ffi {
             ty_: String,
             indices: &[u32],
         );
+        fn create_mesh_geom_subset_material_binding(
+            &mut self,
+            path: String,
+            name: String,
+            material_path: String,
+        );
+        fn create_mesh_material_binding(&mut self, path: String, material_path: String);
 
         // meshが削除されたdiffを記録する関数
         fn destroy_mesh(&mut self, path: String);
@@ -51,6 +59,7 @@ pub mod ffi {
             interpolation: Interpolation,
         );
         fn diff_mesh_data_uvs(&mut self, path: String, data: &[f32]);
+        fn diff_mesh_data_uvs_indices(&mut self, path: String, data: &[u32]);
         fn diff_mesh_data_uvs_interpolation(&mut self, path: String, interpolation: Interpolation);
         fn diff_mesh_data_face_vertex_indices(&mut self, path: String, data: &[u32]);
         fn diff_mesh_data_face_vertex_counts(&mut self, path: String, data: &[u32]);
@@ -61,6 +70,13 @@ pub mod ffi {
             ty_: String,
             indices: &[u32],
         );
+        fn diff_mesh_data_geom_subset_material_binding(
+            &mut self,
+            path: String,
+            name: String,
+            material_path: String,
+        );
+        fn diff_mesh_material_binding(&mut self, path: String, material_path: String);
 
         // sphere lightが生成/更新されたdiffの記録とそのデータを設定する関数
         fn add_or_update_sphere_light(&mut self, path: String);
@@ -102,6 +118,23 @@ pub mod ffi {
 
         // render settingsが削除されたdiffを記録する関数
         fn destroy_render_settings(&mut self, path: String);
+
+        // materialが生成/更新されたdiffの記録とそのデータを設定する関数
+        fn add_or_update_material(&mut self, path: String);
+        fn add_or_update_material_diffuse_color(&mut self, path: String, r: f32, g: f32, b: f32);
+        fn add_or_update_material_emissive(&mut self, path: String, r: f32, g: f32, b: f32);
+        fn add_or_update_material_metallic(&mut self, path: String, metallic: f32);
+        fn add_or_update_material_opacity(&mut self, path: String, opacity: f32);
+        fn add_or_update_material_roughness(&mut self, path: String, roughness: f32);
+        fn add_or_update_material_diffuse_color_file(&mut self, path: String, file_path: String);
+        fn add_or_update_material_emissive_file(&mut self, path: String, file_path: String);
+        fn add_or_update_material_metallic_file(&mut self, path: String, file_path: String);
+        fn add_or_update_material_normal_file(&mut self, path: String, file_path: String);
+        fn add_or_update_material_opacity_file(&mut self, path: String, file_path: String);
+        fn add_or_update_material_roughness_file(&mut self, path: String, file_path: String);
+
+        // materialが削除されたdiffを記録する関数
+        fn destroy_material(&mut self, path: String);
     }
     unsafe extern "C++" {
         include!("usd_data_extractor/cpp/usdDataExtractor.h");
@@ -129,6 +162,13 @@ impl Into<String> for SdfPath {
 }
 
 #[derive(Debug, Default)]
+pub struct SubMeshData {
+    pub indices_type: String,
+    pub indices: Vec<u32>,
+    pub material_path: Option<String>,
+}
+
+#[derive(Debug, Default)]
 pub struct MeshCreate {
     pub transform_matrix: Option<[f32; 16]>,
     pub left_handed: Option<bool>,
@@ -136,10 +176,12 @@ pub struct MeshCreate {
     pub normals: Option<Vec<f32>>,
     pub normals_interpolation: Option<Interpolation>,
     pub uvs: Option<Vec<f32>>,
+    pub uvs_indices: Option<Vec<u32>>,
     pub uvs_interpolation: Option<Interpolation>,
     pub face_vertex_indices: Option<Vec<u32>>,
     pub face_vertex_counts: Option<Vec<u32>>,
-    pub geom_subsets: HashMap<String, (String, Vec<u32>)>,
+    pub geom_subsets: HashMap<String, SubMeshData>,
+    pub material_path: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -149,10 +191,12 @@ pub struct MeshDataDiff {
     pub normals: Option<Vec<f32>>,
     pub normals_interpolation: Option<Interpolation>,
     pub uvs: Option<Vec<f32>>,
+    pub uvs_indices: Option<Vec<u32>>,
     pub uvs_interpolation: Option<Interpolation>,
     pub face_vertex_indices: Option<Vec<u32>>,
     pub face_vertex_counts: Option<Vec<u32>>,
-    pub geom_subsets: HashMap<String, (String, Vec<u32>)>,
+    pub geom_subsets: HashMap<String, SubMeshData>,
+    pub material_path: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -221,12 +265,34 @@ pub struct RenderSettingsDiff {
 }
 
 #[derive(Debug, Default)]
+pub struct MaterialDiffItem {
+    pub diffuse_color: Option<[f32; 3]>,
+    pub emissive: Option<[f32; 3]>,
+    pub metallic: Option<f32>,
+    pub opacity: Option<f32>,
+    pub roughness: Option<f32>,
+    pub diffuse_color_file: Option<String>,
+    pub emissive_file: Option<String>,
+    pub metallic_file: Option<String>,
+    pub normal_file: Option<String>,
+    pub opacity_file: Option<String>,
+    pub roughness_file: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct MaterialsDiff {
+    pub update: HashMap<SdfPath, MaterialDiffItem>,
+    pub destroy: Vec<SdfPath>,
+}
+
+#[derive(Debug, Default)]
 pub struct UsdDataDiff {
     pub meshes: MeshesDiff,
     pub sphere_lights: SphereLightsDiff,
     pub distant_lights: DistantLightsDiff,
     pub cameras: CamerasDiff,
     pub render_settings: RenderSettingsDiff,
+    pub materials: MaterialsDiff,
 }
 impl UsdDataDiff {
     // === Mesh ===
@@ -274,6 +340,12 @@ impl UsdDataDiff {
         }
     }
 
+    fn create_mesh_uvs_indices(&mut self, path: String, data: &[u32]) {
+        if let Some(create) = self.meshes.create.get_mut(&SdfPath(path)) {
+            create.uvs_indices = Some(data.to_vec());
+        }
+    }
+
     fn create_mesh_uvs_interpolation(&mut self, path: String, interpolation: Interpolation) {
         if let Some(create) = self.meshes.create.get_mut(&SdfPath(path)) {
             create.uvs_interpolation = Some(interpolation);
@@ -300,7 +372,27 @@ impl UsdDataDiff {
         indices: &[u32],
     ) {
         if let Some(create) = self.meshes.create.get_mut(&SdfPath(path)) {
-            create.geom_subsets.insert(name, (ty_, indices.to_vec()));
+            let sub_mesh = create.geom_subsets.entry(name).or_default();
+            sub_mesh.indices_type = ty_;
+            sub_mesh.indices = indices.to_vec();
+        }
+    }
+
+    fn create_mesh_geom_subset_material_binding(
+        &mut self,
+        path: String,
+        name: String,
+        material_path: String,
+    ) {
+        if let Some(create) = self.meshes.create.get_mut(&SdfPath(path)) {
+            let sub_mesh = create.geom_subsets.entry(name).or_default();
+            sub_mesh.material_path = Some(material_path);
+        }
+    }
+
+    fn create_mesh_material_binding(&mut self, path: String, material_path: String) {
+        if let Some(create) = self.meshes.create.get_mut(&SdfPath(path)) {
+            create.material_path = Some(material_path);
         }
     }
 
@@ -351,6 +443,12 @@ impl UsdDataDiff {
         }
     }
 
+    fn diff_mesh_data_uvs_indices(&mut self, path: String, data: &[u32]) {
+        if let Some(diff) = self.meshes.diff_mesh_data.get_mut(&SdfPath(path)) {
+            diff.uvs_indices = Some(data.to_vec());
+        }
+    }
+
     fn diff_mesh_data_uvs_interpolation(&mut self, path: String, interpolation: Interpolation) {
         if let Some(diff) = self.meshes.diff_mesh_data.get_mut(&SdfPath(path)) {
             diff.uvs_interpolation = Some(interpolation);
@@ -377,7 +475,27 @@ impl UsdDataDiff {
         indices: &[u32],
     ) {
         if let Some(diff) = self.meshes.diff_mesh_data.get_mut(&SdfPath(path)) {
-            diff.geom_subsets.insert(name, (ty_, indices.to_vec()));
+            let sub_mesh = diff.geom_subsets.entry(name).or_default();
+            sub_mesh.indices_type = ty_;
+            sub_mesh.indices = indices.to_vec();
+        }
+    }
+
+    fn diff_mesh_data_geom_subset_material_binding(
+        &mut self,
+        path: String,
+        name: String,
+        material_path: String,
+    ) {
+        if let Some(diff) = self.meshes.diff_mesh_data.get_mut(&SdfPath(path)) {
+            let sub_mesh = diff.geom_subsets.entry(name).or_default();
+            sub_mesh.material_path = Some(material_path);
+        }
+    }
+
+    fn diff_mesh_material_binding(&mut self, path: String, material_path: String) {
+        if let Some(diff) = self.meshes.diff_mesh_data.get_mut(&SdfPath(path)) {
+            diff.material_path = Some(material_path);
         }
     }
 
@@ -512,5 +630,83 @@ impl UsdDataDiff {
 
     fn destroy_render_settings(&mut self, path: String) {
         self.render_settings.destroy.push(SdfPath(path));
+    }
+
+    // === Material ===
+
+    fn add_or_update_material(&mut self, path: String) {
+        self.materials
+            .update
+            .insert(SdfPath(path), MaterialDiffItem::default());
+    }
+
+    fn add_or_update_material_diffuse_color(&mut self, path: String, r: f32, g: f32, b: f32) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.diffuse_color = Some([r, g, b]);
+        }
+    }
+
+    fn add_or_update_material_emissive(&mut self, path: String, r: f32, g: f32, b: f32) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.emissive = Some([r, g, b]);
+        }
+    }
+
+    fn add_or_update_material_metallic(&mut self, path: String, metallic: f32) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.metallic = Some(metallic);
+        }
+    }
+
+    fn add_or_update_material_opacity(&mut self, path: String, opacity: f32) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.opacity = Some(opacity);
+        }
+    }
+
+    fn add_or_update_material_roughness(&mut self, path: String, roughness: f32) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.roughness = Some(roughness);
+        }
+    }
+
+    fn add_or_update_material_diffuse_color_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.diffuse_color_file = Some(file_path);
+        }
+    }
+
+    fn add_or_update_material_emissive_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.emissive_file = Some(file_path);
+        }
+    }
+
+    fn add_or_update_material_metallic_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.metallic_file = Some(file_path);
+        }
+    }
+
+    fn add_or_update_material_normal_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.normal_file = Some(file_path);
+        }
+    }
+
+    fn add_or_update_material_opacity_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.opacity_file = Some(file_path);
+        }
+    }
+
+    fn add_or_update_material_roughness_file(&mut self, path: String, file_path: String) {
+        if let Some(create) = self.materials.update.get_mut(&SdfPath(path)) {
+            create.roughness_file = Some(file_path);
+        }
+    }
+
+    fn destroy_material(&mut self, path: String) {
+        self.materials.destroy.push(SdfPath(path));
     }
 }

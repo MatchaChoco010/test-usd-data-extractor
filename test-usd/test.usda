@@ -6,6 +6,7 @@
     metersPerUnit = 1
     startTimeCode = 1
     subLayers = [
+        @./monkey.usda@,
         @./pig.usd@,
         @./SphereB.usd@,
         @./SphereA.usd@

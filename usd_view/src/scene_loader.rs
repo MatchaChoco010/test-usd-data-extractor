@@ -191,6 +191,12 @@ impl UsdSceneExtractorTask {
                     let path: String = path.into();
                     sync_items.render_settings.settings.remove(&path);
                 }
+                SceneDiffItem::MaterialAddOrUpdate(path, material) => {
+                    sync_items.scene.insert_material(path.into(), material);
+                }
+                SceneDiffItem::MaterialDestroyed(path) => {
+                    sync_items.scene.remove_material(path.into());
+                }
             }
         }
     }

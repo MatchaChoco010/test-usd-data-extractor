@@ -3,6 +3,7 @@
 
 #include "cameraObserver.h"
 #include "distantLightObserver.h"
+#include "materialObserver.h"
 #include "meshObserver.h"
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
@@ -43,6 +44,7 @@ private:
   SphereLightObserver _sphereLightObserver;
   DistantLightObserver _distantLightObserver;
   CameraObserver _cameraObserver;
+  MaterialObserver _materialObserver;
 
   // This class does not support copying.
   HdBridgeSceneIndexObserver(const HdBridgeSceneIndexObserver&) = delete;

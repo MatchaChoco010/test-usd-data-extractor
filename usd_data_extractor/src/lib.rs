@@ -1,3 +1,4 @@
+use bridge::SubMeshData;
 use glam::{Mat4, Vec2, Vec3};
 use std::collections::HashMap;
 use std::path::Path;
@@ -26,6 +27,8 @@ pub struct Vertex {
 pub struct SubMesh {
     /// sub meshのindices
     pub indices: Vec<u32>,
+    /// materialのパス
+    pub material: Option<String>,
 }
 
 /// USDから抽出した頂点属性などをduplicateしtriangulateし、sub meshに分割したデータ。
@@ -44,10 +47,12 @@ impl MeshData {
         normals: Option<Vec<f32>>,
         normals_interpolation: Option<Interpolation>,
         uvs: Option<Vec<f32>>,
+        uvs_indices: Option<Vec<u32>>,
         uvs_interpolation: Option<Interpolation>,
         face_vertex_indices: Vec<u32>,
         face_vertex_counts: Vec<u32>,
-        geom_subsets: HashMap<String, (String, Vec<u32>)>,
+        geom_subsets: HashMap<String, SubMeshData>,
+        material: Option<String>,
     ) -> Self {
         // InterpolationがVertexの頂点データをduplicatedするindexを計算する
         let duplicate_vertex_indices = {
@@ -132,14 +137,26 @@ impl MeshData {
 
         // duplicatedしたUV座標のデータを作成する
         let vertex_uvs = {
-            if let (Some(uvs), Some(uvs_interpolation)) = (uvs, uvs_interpolation) {
+            if let (Some(uvs), Some(uvs_indices), Some(uvs_interpolation)) =
+                (uvs, uvs_indices, uvs_interpolation)
+            {
                 match uvs_interpolation {
                     Interpolation::FaceVarying => {
                         let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
-                        Some(uvs.to_vec())
+                        let uvs = uvs_indices
+                            .iter()
+                            .map(|&index| uvs[index as usize])
+                            .map(|uv| Vec2::new(uv.x, 1.0 - uv.y))
+                            .collect();
+                        Some(uvs)
                     }
                     Interpolation::Vertex => {
                         let uvs = bytemuck::cast_slice::<f32, Vec2>(&uvs);
+                        let uvs = uvs_indices
+                            .iter()
+                            .map(|&index| uvs[index as usize])
+                            .map(|uv| Vec2::new(uv.x, 1.0 - uv.y))
+                            .collect::<Vec<_>>();
                         let mut data = Vec::with_capacity(duplicate_vertex_indices.len());
                         for &index in &duplicate_vertex_indices {
                             data.push(uvs[index]);
@@ -166,9 +183,9 @@ impl MeshData {
         // sub meshのindex情報を作る
         let mut used_face_indices = Vec::new();
         let mut sub_meshes = Vec::new();
-        for (_sub_mesh_name, (ty_, indices)) in geom_subsets {
+        for (_sub_mesh_name, data) in geom_subsets {
             // typeFaceSet以外のいgeomSubsetsには未対応
-            if ty_ != "typeFaceSet" {
+            if data.indices_type != "typeFaceSet" {
                 continue;
             }
 
@@ -177,7 +194,42 @@ impl MeshData {
             let mut index_offset = 0;
             for (i, face_vertex_count) in face_vertex_counts.iter().enumerate() {
                 let face_vertex_count = *face_vertex_count as usize;
-                if indices.contains(&(i as u32)) {
+                if data.indices.contains(&(i as u32)) {
+                    for i in 2..face_vertex_count {
+                        if left_handed {
+                            sub_mesh_indices.push((index_offset + i) as u32);
+                            sub_mesh_indices.push((index_offset + i - 1) as u32);
+                            sub_mesh_indices.push(index_offset as u32);
+                        } else {
+                            sub_mesh_indices.push(index_offset as u32);
+                            sub_mesh_indices.push((index_offset + i - 1) as u32);
+                            sub_mesh_indices.push((index_offset + i) as u32);
+                        }
+                    }
+                    used_face_indices.push(i as u64);
+                }
+                index_offset += face_vertex_count;
+            }
+
+            sub_meshes.push(SubMesh {
+                indices: sub_mesh_indices,
+                material: data.material_path,
+            });
+        }
+
+        // geomSubsetに含まれなかったfaceをtriangulateしたindexによるsub meshを作る
+        let mut base_indices = Vec::new();
+        for i in 0..face_vertex_counts.len() {
+            if !used_face_indices.contains(&(i as u64)) {
+                base_indices.push(i as u64);
+            }
+        }
+        if !base_indices.is_empty() {
+            let mut sub_mesh_indices = Vec::new();
+            let mut index_offset = 0;
+            for (i, face_vertex_count) in face_vertex_counts.iter().enumerate() {
+                let face_vertex_count = *face_vertex_count as usize;
+                if base_indices.contains(&(i as u64)) {
                     for i in 2..face_vertex_count {
                         if left_handed {
                             sub_mesh_indices.push((index_offset + i) as u32);
@@ -195,39 +247,9 @@ impl MeshData {
             }
             sub_meshes.push(SubMesh {
                 indices: sub_mesh_indices,
+                material,
             });
         }
-
-        // geomSubsetに含まれなかったfaceをtriangulateしたindexによるsub meshを作る
-        let mut base_indices = Vec::new();
-        for i in 0..face_vertex_counts.len() {
-            if !used_face_indices.contains(&(i as u64)) {
-                base_indices.push(i as u64);
-            }
-        }
-        let mut sub_mesh_indices = Vec::new();
-        let mut index_offset = 0;
-        for (i, face_vertex_count) in face_vertex_counts.iter().enumerate() {
-            let face_vertex_count = *face_vertex_count as usize;
-            if base_indices.contains(&(i as u64)) {
-                for i in 2..face_vertex_count {
-                    if left_handed {
-                        sub_mesh_indices.push((index_offset + i) as u32);
-                        sub_mesh_indices.push((index_offset + i - 1) as u32);
-                        sub_mesh_indices.push(index_offset as u32);
-                    } else {
-                        sub_mesh_indices.push(index_offset as u32);
-                        sub_mesh_indices.push((index_offset + i - 1) as u32);
-                        sub_mesh_indices.push((index_offset + i) as u32);
-                    }
-                }
-                used_face_indices.push(i as u64);
-            }
-            index_offset += face_vertex_count;
-        }
-        sub_meshes.push(SubMesh {
-            indices: sub_mesh_indices,
-        });
 
         Self {
             vertices,
@@ -325,6 +347,50 @@ pub struct RenderSettings {
     pub render_products: HashMap<String, RenderProduct>,
 }
 
+#[derive(Debug)]
+pub struct Material {
+    pub diffuse_color: Vec3,
+    pub emissive: Vec3,
+    pub metallic: f32,
+    pub opacity: f32,
+    pub roughness: f32,
+    pub diffuse_texture: Option<String>,
+    pub emissive_texture: Option<String>,
+    pub metallic_texture: Option<String>,
+    pub opacity_texture: Option<String>,
+    pub roughness_texture: Option<String>,
+    pub normal_texture: Option<String>,
+}
+impl Material {
+    fn new(
+        diffuse_color: Option<[f32; 3]>,
+        emissive: Option<[f32; 3]>,
+        metallic: Option<f32>,
+        opacity: Option<f32>,
+        roughness: Option<f32>,
+        diffuse_texture: Option<String>,
+        emissive_texture: Option<String>,
+        metallic_texture: Option<String>,
+        opacity_texture: Option<String>,
+        roughness_texture: Option<String>,
+        normal_texture: Option<String>,
+    ) -> Self {
+        Self {
+            diffuse_color: diffuse_color.map_or(Vec3::ONE, |f| Vec3::from(f)),
+            emissive: emissive.map_or(Vec3::ZERO, |f| Vec3::from(f)),
+            metallic: metallic.unwrap_or(0.0),
+            opacity: opacity.unwrap_or(1.0),
+            roughness: roughness.unwrap_or(0.5),
+            diffuse_texture,
+            emissive_texture,
+            metallic_texture,
+            opacity_texture,
+            roughness_texture,
+            normal_texture,
+        }
+    }
+}
+
 /// シーンの変更点の差分情報の一つの要素
 pub enum SceneDiffItem {
     MeshCreated(SdfPath, TransformMatrix, MeshData),
@@ -339,6 +405,8 @@ pub enum SceneDiffItem {
     CameraDestroyed(SdfPath),
     RenderSettingsAddOrUpdate(SdfPath, RenderSettings),
     RenderSettingsDestroyed(SdfPath),
+    MaterialAddOrUpdate(SdfPath, Material),
+    MaterialDestroyed(SdfPath),
 }
 
 /// シーンの変更点の差分情報全体
@@ -364,10 +432,12 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
                     data.normals,
                     data.normals_interpolation,
                     data.uvs,
+                    data.uvs_indices,
                     data.uvs_interpolation,
                     data.face_vertex_indices.unwrap(),
                     data.face_vertex_counts.unwrap(),
                     data.geom_subsets,
+                    data.material_path,
                 ),
             ));
         }
@@ -391,10 +461,12 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
                     data.normals,
                     data.normals_interpolation,
                     data.uvs,
+                    data.uvs_indices,
                     data.uvs_interpolation,
                     data.face_vertex_indices.unwrap(),
                     data.face_vertex_counts.unwrap(),
                     data.geom_subsets,
+                    data.material_path,
                 ),
             ));
         }
@@ -460,6 +532,28 @@ impl From<bridge::UsdDataDiff> for SceneDiff {
         }
         for path in diff.render_settings.destroy {
             items.push(SceneDiffItem::RenderSettingsDestroyed(path));
+        }
+
+        for (path, data) in diff.materials.update {
+            items.push(SceneDiffItem::MaterialAddOrUpdate(
+                path,
+                Material::new(
+                    data.diffuse_color,
+                    data.emissive,
+                    data.metallic,
+                    data.opacity,
+                    data.roughness,
+                    data.diffuse_color_file,
+                    data.emissive_file,
+                    data.metallic_file,
+                    data.opacity_file,
+                    data.roughness_file,
+                    data.normal_file,
+                ),
+            ));
+        }
+        for path in diff.materials.destroy {
+            items.push(SceneDiffItem::MaterialDestroyed(path));
         }
 
         Self { items }
